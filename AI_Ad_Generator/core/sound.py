@@ -13,7 +13,10 @@ from config import TEMP_DIR, OUTPUTS_DIR
 # Point moviepy/pydub at the bundled ffmpeg so audio works without a system
 # ffmpeg install. Safe to call early; it only sets things if available.
 from .ffmpeg_setup import configure_ffmpeg
+from .logger import get_logger
 configure_ffmpeg()
+
+log = get_logger("sound")
 
 
 def generate_voiceover(text, output_path=None, rate=165):
@@ -36,7 +39,7 @@ def generate_voiceover(text, output_path=None, rate=165):
         engine.save_to_file(text, output_path)
         engine.runAndWait()
     except Exception as e:
-        print(f"Voiceover error: {e}")
+        log.error("Voiceover error: %s", e)
         return None
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
         return output_path
@@ -65,7 +68,7 @@ def generate_background_music(output_path=None, duration=8, tempo=112):
         music = sum(notes, AudioSegment.empty())[: duration * 1000]
         music.export(output_path, format="wav")
     except Exception as e:
-        print(f"Background music error: {e}")
+        log.error("Background music error: %s", e)
         return None
     return output_path if os.path.exists(output_path) else None
 
@@ -136,5 +139,5 @@ def add_sound_to_video(video_path, prompt=None, voiceover=True, music=True,
                 pass
         return out if os.path.exists(out) else video_path
     except Exception as e:
-        print(f"add_sound_to_video error: {e}")
+        log.error("add_sound_to_video error: %s", e)
         return video_path

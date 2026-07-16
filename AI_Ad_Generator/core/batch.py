@@ -1,11 +1,16 @@
 import os
-from config import MODELS_DIR
+import json
+import time
+from config import MODELS_DIR, OUTPUTS_DIR
 from .text_to_video import TextToVideoGenerator
 from .image_to_video import ImageToVideoGenerator
 from .text_to_image import TextToImageGenerator
 from .background_remover import BackgroundRemover
 from .image_editor import ImageEditor
 from .online_apis import get_provider
+from .logger import get_logger
+
+log = get_logger("batch")
 
 
 class BatchProcessor:
@@ -29,7 +34,8 @@ class BatchProcessor:
         self._stop = True
 
     # ------------------------------------------------------------------ #
-    def run(self, jobs, progress_callback=None):
+    def run(self, jobs, progress_callback=None, save_summary=True):
+        self._stop = False  # reset so a previous stop() doesn't kill this run
         results = []
         total = max(len(jobs), 1)
         for i, job in enumerate(jobs):
@@ -43,13 +49,46 @@ class BatchProcessor:
                     overall = int((i + value / 100.0) / total * 100)
                     progress_callback(overall, f"[{i + 1}/{total}] {message}")
 
+            log.info("Starting job %d/%d: %s", i + 1, total, job.get("type"))
             try:
                 out = self._run_one(job, job_progress)
                 results.append({"job": job, "output": out, "status": "ok"})
+                log.info("Job %d/%d OK -> %s", i + 1, total, out)
             except Exception as e:
+                log.error("Job %d/%d failed: %s", i + 1, total, e)
                 results.append({"job": job, "output": None,
                                 "status": "error", "error": str(e)})
+        if save_summary:
+            self._write_summary(results)
         return results
+
+    def _write_summary(self, results):
+        """Write a JSON summary of the batch run into outputs/."""
+        try:
+            ts = int(time.time())
+            path = os.path.join(OUTPUTS_DIR, f"batch_summary_{ts}.json")
+            ok = sum(1 for r in results if r["status"] == "ok")
+            summary = {
+                "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "total": len(results),
+                "succeeded": ok,
+                "failed": sum(1 for r in results if r["status"] == "error"),
+                "cancelled": sum(1 for r in results if r["status"] == "cancelled"),
+                "results": [
+                    {"type": r["job"].get("type"),
+                     "status": r["status"],
+                     "output": r["output"],
+                     "error": r.get("error")}
+                    for r in results
+                ],
+            }
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=2, ensure_ascii=False)
+            log.info("Batch summary written: %s (%d ok)", path, ok)
+            return path
+        except Exception as e:
+            log.warning("Could not write batch summary: %s", e)
+            return None
 
     # ------------------------------------------------------------------ #
     def _run_one(self, job, cb):
@@ -82,6 +121,7 @@ class BatchProcessor:
                 num_frames=job.get("frames", 25),
                 motion_bucket_id=job.get("motion", 127),
                 noise_aug=job.get("noise", 0.02),
+                num_steps=job.get("steps", 25),
                 seed=job.get("seed", -1),
                 model=job.get("model", "svd"),
                 progress_callback=cb,
@@ -119,5 +159,5 @@ class BatchProcessor:
                 music=True,
             )
         except Exception as e:
-            print(f"Batch sound error: {e}")
+            log.error("Batch sound error: %s", e)
             return video_path

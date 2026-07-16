@@ -11,6 +11,13 @@ echo.
 echo (Install the base requirements first with install.bat)
 echo.
 
+if not exist venv\Scripts\activate.bat (
+    echo [ERROR] Virtual environment not found.
+    echo Please run install.bat first.
+    pause
+    exit /b 1
+)
+
 call venv\Scripts\activate.bat
 
 echo Upgrading dependencies for advanced models...

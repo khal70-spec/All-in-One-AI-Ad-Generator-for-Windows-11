@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from core.video_editor import VideoEditor
+from core.utils import open_path
+from config import OUTPUTS_DIR
 from tkinter import filedialog
 import threading
 import os
@@ -199,7 +201,7 @@ class EditorTab:
 
         ctk.CTkButton(btn_frame, text="📂 Open Output",
                       fg_color=COLORS["bg_light"],
-                      command=lambda: os.startfile("outputs")).pack(side="left", padx=5)
+                      command=lambda: open_path(OUTPUTS_DIR)).pack(side="left", padx=5)
 
     def _select_video(self):
         path = filedialog.askopenfilename(
@@ -232,17 +234,20 @@ class EditorTab:
         if not text:
             return
 
+        # Snapshot widget values on the UI thread (tkinter is not thread-safe)
+        video = self.selected_video
+        position = self.text_pos_var.get()
         self.progress_label.configure(text="Adding text...")
 
         def run():
             try:
-                output = self.editor.add_text_to_video(
-                    self.selected_video, text, self.text_pos_var.get())
+                output = self.editor.add_text_to_video(video, text, position)
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Saved: {os.path.basename(output)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -251,18 +256,21 @@ class EditorTab:
             self.progress_label.configure(text="⚠️ Select video and audio!")
             return
 
+        # Snapshot widget values on the UI thread
+        video = self.selected_video
+        audio = self.selected_audio
+        volume = float(self.volume_slider.get())
         self.progress_label.configure(text="Adding music...")
 
         def run():
             try:
-                output = self.editor.add_music(
-                    self.selected_video, self.selected_audio,
-                    self.volume_slider.get())
+                output = self.editor.add_music(video, audio, volume)
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Saved: {os.path.basename(output)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -285,46 +293,60 @@ class EditorTab:
 
         def run():
             try:
-                output = self.editor.combine_videos(self.video_list)
+                output = self.editor.combine_videos(list(self.video_list))
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Saved: {os.path.basename(output)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()
 
     def _loop_video(self):
         if not self.selected_video:
+            self.progress_label.configure(text="⚠️ Select a video first!")
             return
 
-        loops = int(self.loop_entry.get())
+        try:
+            loops = int(self.loop_entry.get())
+            if loops < 1:
+                raise ValueError
+        except ValueError:
+            self.progress_label.configure(text="⚠️ Loops must be a positive number!")
+            return
+
+        video = self.selected_video
         self.progress_label.configure(text="Looping video...")
 
         def run():
             try:
-                output = self.editor.loop_video(self.selected_video, loops)
+                output = self.editor.loop_video(video, loops)
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Saved: {os.path.basename(output)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()
 
     def _change_speed(self, speed):
         if not self.selected_video:
+            self.progress_label.configure(text="⚠️ Select a video first!")
             return
 
+        video = self.selected_video
         self.progress_label.configure(text=f"Adjusting speed to {speed}x...")
 
         def run():
             try:
-                output = self.editor.adjust_speed(self.selected_video, speed)
+                output = self.editor.adjust_speed(video, speed)
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Saved: {os.path.basename(output)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()

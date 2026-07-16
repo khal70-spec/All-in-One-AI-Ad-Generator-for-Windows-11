@@ -67,7 +67,10 @@ def check_requirements():
 def main():
     """Main entry point"""
     if not check_requirements():
-        input("\nPress Enter to exit...")
+        try:
+            input("\nPress Enter to exit...")
+        except EOFError:
+            pass  # no console (e.g. windowed PyInstaller build)
         sys.exit(1)
 
     print("\nStarting AI Ad Generator...")

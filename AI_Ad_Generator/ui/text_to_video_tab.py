@@ -1,7 +1,8 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from core.text_to_video import TextToVideoGenerator
-from config import AD_TEMPLATES
+from core.utils import open_path
+from config import AD_TEMPLATES, get_ui_pref, set_ui_pref
 import threading
 import os
 
@@ -9,14 +10,18 @@ import os
 class TextToVideoTab:
     """Text to Video generation tab"""
 
+    _PREFS = "text_to_video"  # key under config.json -> ui_prefs
+
     def __init__(self, parent, model_manager, prompt_generator):
         self.parent = parent
         self.model_manager = model_manager
         self.prompt_generator = prompt_generator
         self.generator = TextToVideoGenerator(model_manager)
         self.is_generating = False
+        self._cancel_requested = False
 
         self._create_ui()
+        self._restore_prefs()
 
     def _create_ui(self):
         # Main container with two columns
@@ -190,7 +195,19 @@ class TextToVideoTab:
             hover_color=COLORS["accent_hover"],
             command=self._generate,
         )
-        self.generate_btn.pack(fill="x", padx=10, pady=15)
+        self.generate_btn.pack(fill="x", padx=10, pady=(15, 5))
+
+        # Cancel button (enabled only while generating)
+        self.cancel_btn = ctk.CTkButton(
+            left_panel,
+            text="⏹ Cancel",
+            font=FONTS["body"],
+            height=34,
+            fg_color=COLORS["error"],
+            state="disabled",
+            command=self._cancel,
+        )
+        self.cancel_btn.pack(fill="x", padx=10, pady=(0, 10))
 
         # Progress
         self.progress_bar = ctk.CTkProgressBar(left_panel, progress_color=COLORS["accent"])
@@ -269,6 +286,42 @@ class TextToVideoTab:
                 self.guidance_slider.set(template["guidance"])
                 break
 
+    def _get_seed(self):
+        """Parse the seed entry safely; -1 (random) on invalid input."""
+        try:
+            return int(self.seed_entry.get().strip())
+        except (ValueError, AttributeError):
+            return -1
+
+    # ------------------------------------------------------------------ #
+    # Preferences (restored from config.json on launch)
+    # ------------------------------------------------------------------ #
+    def _restore_prefs(self):
+        p = self._PREFS
+        self.model_var.set(get_ui_pref(p, "model", "zeroscope"))
+        self.size_var.set(get_ui_pref(p, "size", "512x512"))
+        steps = float(get_ui_pref(p, "steps", 25))
+        guidance = float(get_ui_pref(p, "guidance", 7.5))
+        frames = float(get_ui_pref(p, "frames", 24))
+        self.steps_slider.set(steps)
+        self.steps_label.configure(text=str(int(steps)))
+        self.guidance_slider.set(guidance)
+        self.guidance_label.configure(text=f"{guidance:.1f}")
+        self.frames_slider.set(frames)
+        self.frames_label.configure(text=str(int(frames)))
+        self.sound_voice_var.set(bool(get_ui_pref(p, "sound_voice", True)))
+        self.sound_music_var.set(bool(get_ui_pref(p, "sound_music", True)))
+
+    def _save_prefs(self):
+        p = self._PREFS
+        set_ui_pref(p, "model", self.model_var.get())
+        set_ui_pref(p, "size", self.size_var.get())
+        set_ui_pref(p, "steps", int(self.steps_slider.get()))
+        set_ui_pref(p, "guidance", round(float(self.guidance_slider.get()), 2))
+        set_ui_pref(p, "frames", int(self.frames_slider.get()))
+        set_ui_pref(p, "sound_voice", self.sound_voice_var.get())
+        set_ui_pref(p, "sound_music", self.sound_music_var.get())
+
     def _generate(self):
         if self.is_generating:
             return
@@ -278,30 +331,43 @@ class TextToVideoTab:
             self.progress_label.configure(text="⚠️ Please enter a prompt!")
             return
 
+        # Snapshot all widget values on the UI thread (tkinter is not
+        # thread-safe, so the worker must not read widgets directly).
+        size = self.size_var.get().split("x")
+        width, height = int(size[0]), int(size[1])
+        negative = self.negative_text.get("0.0", "end").strip()
+        num_frames = int(self.frames_slider.get())
+        num_steps = int(self.steps_slider.get())
+        guidance = float(self.guidance_slider.get())
+        seed = self._get_seed()
+        model = self.model_var.get()
+
+        self._save_prefs()
         self.is_generating = True
+        self._cancel_requested = False
         self.generate_btn.configure(state="disabled", text="⏳ Generating...")
+        self.cancel_btn.configure(state="normal")
 
         def run():
             try:
-                size = self.size_var.get().split("x")
-                width, height = int(size[0]), int(size[1])
-
                 output = self.generator.generate(
                     prompt=prompt,
-                    negative_prompt=self.negative_text.get("0.0", "end").strip(),
-                    num_frames=int(self.frames_slider.get()),
+                    negative_prompt=negative,
+                    num_frames=num_frames,
                     width=width,
                     height=height,
-                    num_steps=int(self.steps_slider.get()),
-                    guidance_scale=float(self.guidance_slider.get()),
-                    seed=int(self.seed_entry.get()),
-                    model=self.model_var.get(),
+                    num_steps=num_steps,
+                    guidance_scale=guidance,
+                    seed=seed,
+                    model=model,
                     progress_callback=self._update_progress,
+                    cancel_check=lambda: self._cancel_requested,
                 )
 
                 self.parent.after(0, lambda: self._on_complete(output))
 
             except Exception as e:
+                local_err = str(e)
                 # Optional cloud fallback when local generation fails
                 from config import USER_SETTINGS
                 if USER_SETTINGS.get("use_online_fallback") and prompt:
@@ -313,10 +379,11 @@ class TextToVideoTab:
                         self.parent.after(0, lambda: self._on_complete(out))
                         return
                     except Exception as fe:
-                        self.parent.after(0, lambda: self._on_error(
-                            f"Local: {e}\nCloud: {fe}"))
+                        cloud_err = str(fe)
+                        self.parent.after(0, lambda m=f"Local: {local_err}\nCloud: {cloud_err}":
+                                          self._on_error(m))
                         return
-                self.parent.after(0, lambda: self._on_error(str(e)))
+                self.parent.after(0, lambda m=local_err: self._on_error(m))
 
         thread = threading.Thread(target=run, daemon=True)
         thread.start()
@@ -325,9 +392,15 @@ class TextToVideoTab:
         self.parent.after(0, lambda: self.progress_bar.set(value / 100))
         self.parent.after(0, lambda: self.progress_label.configure(text=message))
 
+    def _cancel(self):
+        self._cancel_requested = True
+        self.cancel_btn.configure(state="disabled")
+        self.progress_label.configure(text="⏹ Cancelling after current step...")
+
     def _on_complete(self, output_path):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 GENERATE VIDEO")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(1)
         self.progress_label.configure(text="✅ Generation complete!")
         self.output_label.configure(text=f"Saved: {output_path}")
@@ -344,29 +417,25 @@ class TextToVideoTab:
             print(f"Preview error: {e}")
 
         # Optional sound (voiceover + background music)
-        if self.sound_voice_var.get() or self.sound_music_var.get():
+        voice = self.sound_voice_var.get()
+        music = self.sound_music_var.get()
+        if voice or music:
             self.progress_label.configure(text="🔊 Adding sound...")
+            prompt = self.prompt_text.get("0.0", "end").strip()
             threading.Thread(target=self._add_sound,
-                            args=(output_path,), daemon=True).start()
+                            args=(output_path, prompt, voice, music),
+                            daemon=True).start()
 
-    def _add_sound(self, video_path):
+    def _add_sound(self, video_path, prompt, voiceover, music):
         try:
             from core.sound import add_sound_to_video
-            prompt = self.prompt_text.get("0.0", "end").strip()
             out = add_sound_to_video(
                 video_path, prompt=prompt,
-                voiceover=self.sound_voice_var.get(),
-                music=self.sound_music_var.get())
+                voiceover=voiceover,
+                music=music)
             if out and os.path.exists(out):
                 self.last_output = out
-                try:
-                    from core.preview_utils import make_ctk_thumbnail
-                    photo = make_ctk_thumbnail(out)
-                    if photo is not None:
-                        self.preview_label.configure(image=photo, text="")
-                        self.preview_label.image = photo
-                except Exception:
-                    pass
+                self.parent.after(0, lambda: self._refresh_preview(out))
                 self.parent.after(
                     0, lambda: self.progress_label.configure(
                         text="✅ Done — video with sound!"))
@@ -377,16 +446,31 @@ class TextToVideoTab:
             0, lambda: self.progress_label.configure(
                 text="✅ Video ready (sound skipped)"))
 
+    def _refresh_preview(self, video_path):
+        """Update the preview thumbnail. Must run on the UI thread."""
+        try:
+            from core.preview_utils import make_ctk_thumbnail
+            photo = make_ctk_thumbnail(video_path)
+            if photo is not None:
+                self.preview_label.configure(image=photo, text="")
+                self.preview_label.image = photo
+        except Exception:
+            pass
+
     def _on_error(self, error):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 GENERATE VIDEO")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(0)
-        self.progress_label.configure(text=f"❌ Error: {error}")
+        if "Cancelled by user" in str(error):
+            self.progress_label.configure(text="⏹ Cancelled by user")
+        else:
+            self.progress_label.configure(text=f"❌ Error: {error}")
 
     def _open_output_folder(self):
         from config import OUTPUTS_DIR
-        os.startfile(OUTPUTS_DIR)
+        open_path(OUTPUTS_DIR)
 
     def _play_video(self):
         if hasattr(self, 'last_output') and os.path.exists(self.last_output):
-            os.startfile(self.last_output)
+            open_path(self.last_output)

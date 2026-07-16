@@ -2,6 +2,7 @@ import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from config import OUTPUTS_DIR
 from core.preview_utils import extract_thumbnail
+from core.utils import open_path, human_size
 from PIL import Image
 import os
 
@@ -83,9 +84,15 @@ class GalleryTab:
             pass
 
         ctk.CTkLabel(frame, text=name, font=FONTS["small"],
+                    text_color=COLORS["text_secondary"]).pack(pady=(0, 2))
+        try:
+            size_txt = human_size(os.path.getsize(path))
+        except OSError:
+            size_txt = "-"
+        ctk.CTkLabel(frame, text=size_txt, font=("Segoe UI", 9),
                     text_color=COLORS["text_secondary"]).pack(pady=(0, 4))
         ctk.CTkButton(frame, text="▶ Open", height=28,
                       fg_color=COLORS["bg_light"],
-                      command=lambda p=path: os.startfile(p)).pack(
+                      command=lambda p=path: open_path(p)).pack(
                           padx=8, pady=(0, 8))
         return frame

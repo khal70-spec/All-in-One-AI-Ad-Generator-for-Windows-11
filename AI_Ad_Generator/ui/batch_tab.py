@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from core.batch import BatchProcessor
+from core.utils import open_path
 from config import OUTPUTS_DIR
 from tkinter import filedialog
 import threading
@@ -175,7 +176,7 @@ class BatchTab:
 
         ctk.CTkButton(
             right, text="📂 Open Output Folder",
-            fg_color=COLORS["bg_light"], command=lambda: os.startfile(OUTPUTS_DIR)
+            fg_color=COLORS["bg_light"], command=lambda: open_path(OUTPUTS_DIR)
         ).pack(pady=(0, 10))
 
     # ------------------------------------------------------------------ #
@@ -211,6 +212,7 @@ class BatchTab:
                 jobs.append({
                     "type": "image", "image": img,
                     "frames": frames, "motion": 127, "noise": 0.02,
+                    "steps": steps,
                     "remove_bg": self.remove_bg_var.get(),
                     "enhance": self.enhance_var.get(),
                     "model": self.i2v_model_var.get(),
@@ -259,7 +261,8 @@ class BatchTab:
                 err = sum(1 for r in results if r["status"] == "error")
                 self.parent.after(0, lambda: self._on_done(ok, err))
             except Exception as e:
-                self.parent.after(0, lambda: self._on_done(0, len(jobs), str(e)))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self._on_done(0, len(jobs), m))
 
         threading.Thread(target=run, daemon=True).start()
 
