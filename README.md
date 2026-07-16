@@ -57,6 +57,7 @@ AI_Ad_Generator/
 | ✂️ **Video Editor** | Text overlay, background music, combine videos, loop, speed adjustment |
 | 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver**; **cloud fallback** toggle if local generation fails |
 | 🖼 **Gallery** | Browse every generated video/image as a thumbnail grid with one-click open |
+| 🔊 **Sound** | Every generated video gets a voiceover (offline TTS via `pyttsx3`) + a synthesized royalty-free background music bed, muxed in automatically (toggle per tab and in Batch) |
 | ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management, webhook server |
 | 🎬 **Tutorial** | See [`docs/tutorial_video_script.md`](docs/tutorial_video_script.md) — a full scene-by-scene walkthrough using only free tools |
 

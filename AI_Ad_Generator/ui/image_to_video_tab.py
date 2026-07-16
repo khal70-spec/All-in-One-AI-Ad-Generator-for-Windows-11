@@ -129,6 +129,18 @@ class ImageToVideoTab:
             button_color=COLORS["accent"],
         ).pack(fill="x", padx=10, pady=5)
 
+        # ============ SOUND ============
+        ctk.CTkLabel(left_panel, text="🔊 Sound:",
+                     font=FONTS["subheading"]).pack(anchor="w", padx=10, pady=(10, 0))
+        self.sound_voice_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(left_panel, text="Voiceover (from prompt above)",
+                       variable=self.sound_voice_var,
+                       fg_color=COLORS["accent"]).pack(anchor="w", padx=25, pady=2)
+        self.sound_music_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(left_panel, text="Background music",
+                       variable=self.sound_music_var,
+                       fg_color=COLORS["accent"]).pack(anchor="w", padx=25, pady=2)
+
         # Settings
         settings_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
         settings_frame.pack(fill="x", padx=10, pady=10)
@@ -391,6 +403,40 @@ class ImageToVideoTab:
                 self.video_label.image = photo
         except Exception as e:
             print(f"Preview error: {e}")
+
+        # Optional sound (voiceover + background music)
+        if self.sound_voice_var.get() or self.sound_music_var.get():
+            self.progress_label.configure(text="🔊 Adding sound...")
+            threading.Thread(target=self._add_sound,
+                            args=(output_path,), daemon=True).start()
+
+    def _add_sound(self, video_path):
+        try:
+            from core.sound import add_sound_to_video
+            prompt = self.gen_prompt_entry.get().strip()
+            out = add_sound_to_video(
+                video_path, prompt=prompt,
+                voiceover=self.sound_voice_var.get(),
+                music=self.sound_music_var.get())
+            if out and os.path.exists(out):
+                self.last_output = out
+                try:
+                    from core.preview_utils import make_ctk_thumbnail
+                    photo = make_ctk_thumbnail(out)
+                    if photo is not None:
+                        self.video_label.configure(image=photo, text="")
+                        self.video_label.image = photo
+                except Exception:
+                    pass
+                self.parent.after(
+                    0, lambda: self.progress_label.configure(
+                        text="✅ Done — video with sound!"))
+                return
+        except Exception as e:
+            print(f"Sound error: {e}")
+        self.parent.after(
+            0, lambda: self.progress_label.configure(
+                text="✅ Video ready (sound skipped)"))
 
     def _on_error(self, error):
         self.is_generating = False

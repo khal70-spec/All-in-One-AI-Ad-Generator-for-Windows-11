@@ -56,7 +56,7 @@ class BatchProcessor:
         jtype = job.get("type")
 
         if jtype == "text":
-            return self.t2v.generate(
+            out = self.t2v.generate(
                 prompt=job.get("prompt", ""),
                 negative_prompt=job.get("negative", ""),
                 num_frames=job.get("frames", 24),
@@ -68,6 +68,7 @@ class BatchProcessor:
                 model=job.get("model", "zeroscope"),
                 progress_callback=cb,
             )
+            return self._maybe_add_sound(out, job)
 
         if jtype == "image":
             image_path = job["image"]
@@ -76,7 +77,7 @@ class BatchProcessor:
             if job.get("enhance"):
                 image_path = ImageEditor.enhance_image(
                     image_path, brightness=1.05, contrast=1.1, sharpness=1.2)
-            return self.i2v.generate_from_image(
+            out = self.i2v.generate_from_image(
                 image_path=image_path,
                 num_frames=job.get("frames", 25),
                 motion_bucket_id=job.get("motion", 127),
@@ -85,6 +86,7 @@ class BatchProcessor:
                 model=job.get("model", "svd"),
                 progress_callback=cb,
             )
+            return self._maybe_add_sound(out, job)
 
         if jtype == "image_gen":
             return self.t2i.generate(
@@ -104,3 +106,18 @@ class BatchProcessor:
             return provider.generate(prompt=job.get("prompt", ""), progress_callback=cb)
 
         raise ValueError(f"Unknown job type: {jtype}")
+
+    def _maybe_add_sound(self, video_path, job):
+        if not job.get("sound"):
+            return video_path
+        try:
+            from .sound import add_sound_to_video
+            return add_sound_to_video(
+                video_path,
+                prompt=job.get("prompt"),
+                voiceover=bool(job.get("prompt")),
+                music=True,
+            )
+        except Exception as e:
+            print(f"Batch sound error: {e}")
+            return video_path

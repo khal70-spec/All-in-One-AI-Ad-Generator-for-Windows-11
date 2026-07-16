@@ -137,6 +137,11 @@ class BatchTab:
         ).grid(row=3, column=1, columnspan=2, padx=10, sticky="ew", pady=2)
         ctk.CTkLabel(sframe, text="Size:", font=FONTS["body"]).grid(
             row=3, column=0, sticky="w", pady=2)
+        self.sound_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(sframe, text="🔊 Add sound (music)",
+                       variable=self.sound_var,
+                       fg_color=COLORS["accent"]).grid(
+            row=4, column=0, columnspan=3, sticky="w", padx=10, pady=5)
 
         # Buttons
         ctk.CTkButton(
@@ -230,6 +235,8 @@ class BatchTab:
                     "type": "online", "prompt": prompt,
                     "provider": self.provider_var.get(),
                 })
+        for j in jobs:
+            j["sound"] = self.sound_var.get()
         return jobs
 
     def _generate_all(self):
