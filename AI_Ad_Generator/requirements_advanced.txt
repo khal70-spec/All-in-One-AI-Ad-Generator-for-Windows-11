@@ -1,0 +1,17 @@
+# Advanced model support (Mochi 1, HunyuanVideo, LTX-Video).
+#
+# These models require a newer diffusers than the core set. Install the core
+# requirements first, then upgrade with this file:
+#
+#   pip install -r requirements.txt
+#   pip install -r requirements_advanced.txt
+#
+# After upgrading, the advanced models become selectable in the UI. If you
+# skip this file, those models still appear in the menus but fail gracefully
+# with a clear "upgrade diffusers" message.
+
+diffusers==0.33.1
+transformers==4.45.2
+accelerate==1.1.1
+safetensors==0.4.5
+huggingface-hub==0.25.2
