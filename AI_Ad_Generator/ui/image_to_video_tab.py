@@ -363,6 +363,16 @@ class ImageToVideoTab:
         self.output_label.configure(text=f"Saved: {output_path}")
         self.last_output = output_path
 
+        # Show a thumbnail of the result
+        try:
+            from core.preview_utils import make_ctk_thumbnail
+            photo = make_ctk_thumbnail(output_path)
+            if photo is not None:
+                self.video_label.configure(image=photo, text="")
+                self.video_label.image = photo
+        except Exception as e:
+            print(f"Preview error: {e}")
+
     def _on_error(self, error):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 ANIMATE IMAGE")

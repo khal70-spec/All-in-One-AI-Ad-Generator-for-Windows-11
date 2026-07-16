@@ -189,9 +189,10 @@ class EditorTab:
                               corner_radius=10)
         preview.pack(expand=True, fill="both", padx=20, pady=10)
 
-        ctk.CTkLabel(preview, text="Video preview\n\n🎬",
+        self.editor_preview_label = ctk.CTkLabel(preview, text="Video preview\n\n🎬",
                      font=FONTS["body"],
-                     text_color=COLORS["text_secondary"]).pack(expand=True)
+                     text_color=COLORS["text_secondary"])
+        self.editor_preview_label.pack(expand=True)
 
         btn_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
         btn_frame.pack(pady=10)
@@ -206,6 +207,14 @@ class EditorTab:
         if path:
             self.selected_video = path
             self.video_path_label.configure(text=os.path.basename(path))
+            try:
+                from core.preview_utils import make_ctk_thumbnail
+                photo = make_ctk_thumbnail(path)
+                if photo is not None:
+                    self.editor_preview_label.configure(image=photo, text="")
+                    self.editor_preview_label.image = photo
+            except Exception as e:
+                print(f"Preview error: {e}")
 
     def _select_audio(self):
         path = filedialog.askopenfilename(
