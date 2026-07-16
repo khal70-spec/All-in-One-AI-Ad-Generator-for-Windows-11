@@ -10,6 +10,11 @@ missing the video is simply returned unchanged.
 import os
 from config import TEMP_DIR, OUTPUTS_DIR
 
+# Point moviepy/pydub at the bundled ffmpeg so audio works without a system
+# ffmpeg install. Safe to call early; it only sets things if available.
+from .ffmpeg_setup import configure_ffmpeg
+configure_ffmpeg()
+
 
 def generate_voiceover(text, output_path=None, rate=165):
     """Generate a voiceover .wav from ``text`` using offline TTS (pyttsx3)."""

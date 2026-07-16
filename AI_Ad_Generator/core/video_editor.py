@@ -1,5 +1,7 @@
 import os
 from config import OUTPUTS_DIR, TEMP_DIR
+from .ffmpeg_setup import configure_ffmpeg
+configure_ffmpeg()
 
 
 class VideoEditor:
