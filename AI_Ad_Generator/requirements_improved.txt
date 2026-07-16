@@ -1,0 +1,32 @@
+# UI
+customtkinter==5.2.1
+Pillow==10.2.0
+
+# AI Models (core set — works with diffusers 0.27)
+# Version pinned for stability; update requirements_advanced.txt for newer models
+diffusers==0.27.2
+transformers==4.38.2
+accelerate==0.27.2
+safetensors==0.4.3
+omegaconf==2.3.0
+einops==0.7.0
+
+# Video Processing
+opencv-python==4.9.0.80
+moviepy==1.0.3
+imageio==2.34.0
+imageio-ffmpeg==0.4.9
+
+# Image Processing (background removal)
+rembg==2.0.55
+
+# Utilities
+numpy==1.26.4
+tqdm==4.66.2
+requests==2.31.0
+huggingface-hub==0.21.4
+psutil==6.0.0
+
+# Audio (offline TTS + music synthesis)
+pydub==0.25.1
+pyttsx3==2.90
