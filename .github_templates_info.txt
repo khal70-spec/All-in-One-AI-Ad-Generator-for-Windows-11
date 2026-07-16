@@ -1,0 +1,104 @@
+# GitHub Issue & PR Templates
+
+## Bug Report Template
+
+**File**: `.github/ISSUE_TEMPLATE/bug_report.md`
+
+```markdown
+---
+name: Bug Report
+about: Report a bug or issue
+title: "[BUG] Brief description"
+labels: bug
+assignees: ''
+
+---
+
+## Description
+A clear description of the bug.
+
+## Steps to Reproduce
+1. Step 1
+2. Step 2
+3. ...
+
+## Expected Behavior
+What should happen.
+
+## Actual Behavior
+What actually happens.
+
+## Environment
+- Python version: `python --version`
+- GPU: `nvidia-smi`
+- OS: Windows 11 / Other
+
+## Error Log
+```
+Paste relevant errors from temp/app.log
+```
+
+## Screenshots
+If applicable, add screenshots.
+```
+
+## Feature Request Template
+
+**File**: `.github/ISSUE_TEMPLATE/feature_request.md`
+
+```markdown
+---
+name: Feature Request
+about: Suggest a new feature
+title: "[FEATURE] Brief description"
+labels: enhancement
+assignees: ''
+
+---
+
+## Description
+Clear description of the feature.
+
+## Use Case
+Why would this be useful?
+
+## Example Usage
+How would users interact with this?
+
+## Alternatives
+Any alternative approaches considered?
+```
+
+## Pull Request Template
+
+**File**: `.github/pull_request_template.md`
+
+```markdown
+## Description
+Brief description of changes.
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+- [ ] Tested on CPU
+- [ ] Tested on GPU
+- [ ] All tests pass
+- [ ] New tests added
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Comments added for complex logic
+- [ ] Documentation updated
+- [ ] No new warnings generated
+
+## Related Issues
+Closes #(issue number)
+
+## Screenshots
+If applicable, add screenshots.
+```
