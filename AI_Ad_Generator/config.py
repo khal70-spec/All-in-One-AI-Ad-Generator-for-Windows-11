@@ -1,12 +1,13 @@
 import os
 import json
+from typing import Dict, Any, Optional
 
 # ============================================
 # APPLICATION CONFIGURATION
 # ============================================
 
 APP_NAME = "AI Ad Generator"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 APP_ICON = "assets/icon.ico"
 
 # Directories
@@ -18,10 +19,13 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 # Create directories
 for d in [MODELS_DIR, OUTPUTS_DIR, TEMP_DIR, ASSETS_DIR]:
-    os.makedirs(d, exist_ok=True)
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create directory {d}: {e}")
 
 # Model Settings
-MODELS = {
+MODELS: Dict[str, Dict[str, Any]] = {
     "stable_video_diffusion": {
         "name": "Stable Video Diffusion",
         "repo": "stabilityai/stable-video-diffusion-img2vid-xt",
@@ -91,7 +95,7 @@ DEFAULT_GUIDANCE = 7.5
 DEFAULT_SEED = -1  # Random
 
 # Ad Templates
-AD_TEMPLATES = {
+AD_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "product_showcase": {
         "name": "Product Showcase",
         "prompt_template": "Professional product advertisement for {product}, studio lighting, "
@@ -141,7 +145,7 @@ AD_TEMPLATES = {
 # without them. When a key is provided the corresponding provider can generate
 # videos from the cloud (useful on machines without a GPU).
 
-ONLINE_PROVIDERS = {
+ONLINE_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "pika": {
         "name": "Pika",
         "base_url": "https://api.pika.art/v1",
@@ -158,7 +162,7 @@ ONLINE_PROVIDERS = {
 
 # Persisted user settings (API keys, etc.)
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
-USER_SETTINGS = {
+USER_SETTINGS: Dict[str, Any] = {
     "pika_api_key": "",
     "luma_api_key": "",
     "use_online_fallback": False,
@@ -166,44 +170,96 @@ USER_SETTINGS = {
 }
 
 
-def load_settings():
+def _validate_api_key(key: str, provider: str) -> bool:
+    """Validate API key format.
+    
+    Args:
+        key: API key to validate
+        provider: Provider name (pika or luma)
+        
+    Returns:
+        True if key appears valid, False otherwise
+    """
+    if not key or not isinstance(key, str):
+        return False
+    key = key.strip()
+    if len(key) < 10 or len(key) > 500:
+        return False
+    return True
+
+
+def load_settings() -> None:
     """Load user settings (API keys, prefs) from config.json if present."""
     global USER_SETTINGS
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            USER_SETTINGS.update({k: v for k, v in data.items() if k in USER_SETTINGS})
-    except Exception:
-        pass
+            
+            # Only load keys that exist in USER_SETTINGS schema
+            for key, default_value in USER_SETTINGS.items():
+                if key in data:
+                    value = data[key]
+                    # Type check to prevent injection
+                    if type(value) == type(default_value):
+                        USER_SETTINGS[key] = value
+    except json.JSONDecodeError:
+        print("Warning: config.json is corrupted, using defaults")
+    except Exception as e:
+        print(f"Warning: Could not load config: {e}")
 
 
-def save_settings():
-    """Persist current user settings to config.json."""
+def save_settings() -> bool:
+    """Persist current user settings to config.json.
+    
+    Returns:
+        True if save successful, False otherwise
+    """
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(USER_SETTINGS, f, indent=2)
-    except Exception:
-        pass
+        return True
+    except Exception as e:
+        print(f"Warning: Could not save config: {e}")
+        return False
 
 
-def get_ui_pref(section, key, default=None):
-    """Read a persisted per-tab widget value."""
+def get_ui_pref(section: str, key: str, default: Any = None) -> Any:
+    """Read a persisted per-tab widget value.
+    
+    Args:
+        section: Tab/section name
+        key: Setting key
+        default: Default value if not found
+        
+    Returns:
+        Persisted value or default
+    """
     prefs = USER_SETTINGS.get("ui_prefs")
     if not isinstance(prefs, dict):
         return default
     return prefs.get(section, {}).get(key, default)
 
 
-def set_ui_pref(section, key, value):
-    """Persist a per-tab widget value (writes config.json on change)."""
+def set_ui_pref(section: str, key: str, value: Any) -> bool:
+    """Persist a per-tab widget value (writes config.json on change).
+    
+    Args:
+        section: Tab/section name
+        key: Setting key
+        value: Value to persist
+        
+    Returns:
+        True if save successful, False otherwise
+    """
     prefs = USER_SETTINGS.setdefault("ui_prefs", {})
     if not isinstance(prefs, dict):
         prefs = USER_SETTINGS["ui_prefs"] = {}
     section_prefs = prefs.setdefault(section, {})
     if section_prefs.get(key) != value:
         section_prefs[key] = value
-        save_settings()
+        return save_settings()
+    return True
 
 
 # Load any previously saved settings at import time
