@@ -56,24 +56,34 @@ class OnlineProvider:
                         f.write(chunk)
         return output_path
 
+    def _image_data_uri(self, path):
+        """Read a local image and return a base64 data URI for API upload."""
+        import base64
+        import mimetypes
+        mime = mimetypes.guess_type(path)[0] or "image/png"
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+
     # ------------------------------------------------------------------ #
     # To be implemented by subclasses
     # ------------------------------------------------------------------ #
-    def _submit(self, prompt):
+    def _submit(self, prompt, image_path=None, webhook_url=None):
         raise NotImplementedError
 
     def _poll(self, job_id):
         """Return (done: bool, video_url: str|None, error: str|None)."""
         raise NotImplementedError
 
-    def generate(self, prompt, progress_callback=None, poll_timeout=360):
+    def generate(self, prompt, image_path=None, webhook_url=None,
+                 progress_callback=None, poll_timeout=360):
         if not self.is_configured():
             raise RuntimeError(
                 f"{self.name} API key not configured. Add it in Settings → Online APIs."
             )
 
-        job = self._submit(prompt)
-        job_id = job.get("id") or job.get("generation_id") or job.get("id")
+        job = self._submit(prompt, image_path=image_path, webhook_url=webhook_url)
+        job_id = job.get("id") or job.get("generation_id")
         if not job_id:
             raise RuntimeError(f"{self.name}: no job id returned ({job})")
 
@@ -102,11 +112,17 @@ class OnlineProvider:
 class PikaClient(OnlineProvider):
     """Pika Art video generation (https://pika.art)."""
 
-    def _submit(self, prompt):
-        return self._post("/video", {
+    def _submit(self, prompt, image_path=None, webhook_url=None):
+        payload = {
             "prompt": prompt,
             "aspect_ratio": "16:9",
-        })
+        }
+        if image_path:
+            # Image-to-video: upload the source as a data URI.
+            payload["image"] = self._image_data_uri(image_path)
+        if webhook_url:
+            payload["webhook_url"] = webhook_url
+        return self._post("/video", payload)
 
     def _poll(self, job_id):
         data = self._get(f"/video/{job_id}")
@@ -123,8 +139,14 @@ class PikaClient(OnlineProvider):
 class LumaClient(OnlineProvider):
     """Luma Dream Machine video generation (https://lumalabs.ai)."""
 
-    def _submit(self, prompt):
-        return self._post("/generations", {"prompt": prompt})
+    def _submit(self, prompt, image_path=None, webhook_url=None):
+        payload = {"prompt": prompt}
+        if image_path:
+            # Image-to-video: Luma expects an image URL / data URI.
+            payload["image_url"] = self._image_data_uri(image_path)
+        if webhook_url:
+            payload["webhook_url"] = webhook_url
+        return self._post("/generations", payload)
 
     def _poll(self, job_id):
         data = self._get(f"/generations/{job_id}")

@@ -4,9 +4,12 @@ Pillow==10.2.0
 ttkbootstrap==1.10.1
 
 # AI Models
-diffusers==0.27.0
-transformers==4.38.0
-accelerate==0.27.0
+# NOTE: diffusers >= 0.33 is required for the newer models
+# (Mochi 1, HunyuanVideo, LTX-Video). Older pipelines (ZeroScope,
+# CogVideoX, SVD, AnimateDiff, ModelScope, SDXL) still work on this version.
+diffusers==0.33.1
+transformers==4.45.2
+accelerate==1.1.1
 safetensors==0.4.2
 omegaconf==2.3.0
 einops==0.7.0
@@ -26,7 +29,7 @@ numpy==1.26.4
 scipy==1.12.0
 tqdm==4.66.2
 requests==2.31.0
-huggingface-hub==0.21.0
+huggingface-hub==0.25.2
 pyyaml==6.0.1
 psutil==5.9.8
 

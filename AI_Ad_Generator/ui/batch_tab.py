@@ -70,7 +70,8 @@ class BatchTab:
         self.t2v_model_var = ctk.StringVar(value="zeroscope")
         ctk.CTkOptionMenu(
             left, variable=self.t2v_model_var,
-            values=["zeroscope", "cogvideox", "modelscope"],
+            values=["zeroscope", "cogvideox", "modelscope",
+                    "mochi", "hunyuanvideo", "ltx_video"],
             fg_color=COLORS["entry_bg"], button_color=COLORS["accent"],
         ).pack(fill="x", padx=10, pady=5)
 

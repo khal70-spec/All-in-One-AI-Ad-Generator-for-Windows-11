@@ -19,21 +19,25 @@ AI_Ad_Generator/
 │   ├── prompt_generator.py  # Optimized ad-prompt builder
 │   ├── background_remover.py# U2Net background removal
 │   ├── image_editor.py      # Resize / text overlay / enhance
-│   ├── text_to_video.py     # ZeroScope / CogVideoX / ModelScope
+│   ├── text_to_video.py     # ZeroScope / CogVideoX / ModelScope / Mochi / HunyuanVideo / LTX
 │   ├── image_to_video.py    # Stable Video Diffusion / AnimateDiff
 │   ├── text_to_image.py     # Stable Diffusion XL (product images)
 │   ├── video_editor.py      # Cut, text, music, combine, loop, speed
 │   ├── batch.py             # Queue many jobs across the engines
-│   └── online_apis.py       # Pika / Luma cloud video generation
+│   ├── online_apis.py       # Pika / Luma cloud video generation (+ image2video, webhooks)
+│   ├── upscaler.py          # Free online image upscaling (upscale.media)
+│   └── webhook_server.py    # Local webhook receiver for provider callbacks
 ├── ui/                  # CustomTkinter front-end
 │   ├── main_window.py       # Window, header, tabview, status bar
 │   ├── text_to_video_tab.py # Text → Video generation tab
-│   ├── image_to_video_tab.py# Image → Video (+ SDXL image gen) tab
+│   ├── image_to_video_tab.py# Image → Video (+ SDXL image gen, online) tab
 │   ├── prompt_tab.py        # Prompt generator tab
 │   ├── editor_tab.py        # Video editor tab
 │   ├── batch_tab.py         # Batch generation tab
-│   ├── settings_tab.py      # System info + model manager + API keys
+│   ├── settings_tab.py      # System info + model manager + API keys + webhooks
 │   └── styles.py            # Colors & fonts theme
+├── docs/
+│   └── tutorial_video_script.md  # Scene-by-scene YouTube/social tutorial script
 ├── models/              # Downloaded model weights (created at runtime)
 ├── outputs/             # Generated videos (created at runtime)
 ├── temp/                # Intermediate files (created at runtime)
@@ -44,14 +48,15 @@ AI_Ad_Generator/
 
 | Area | Highlights |
 |------|-----------|
-| 📝 **Text to Video** | ZeroScope V2, CogVideoX, **ModelScope T2V**, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed |
-| 🖼 **Image to Video** | Stable Video Diffusion, AnimateDiff, auto background removal, image enhancement, motion control |
+| 📝 **Text to Video** | ZeroScope V2, CogVideoX, **ModelScope T2V**, **Mochi 1**, **HunyuanVideo**, **LTX-Video**, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed |
+| 🖼 **Image to Video** | Stable Video Diffusion, AnimateDiff, auto background removal, image enhancement, **free online upscaling**, motion control, **online Pika/Luma image-to-video** |
 | 🎨 **Image Generation** | **Stable Diffusion XL** to create product images from text (then animate them) |
 | 💡 **Prompt Generator** | 8 styles (cinematic/luxury/tech/…), batch variations, quick templates, auto negative prompts |
 | 🔁 **Batch** | Run many products/images in one queue (Text→Video, Image→Video, Image Gen, **Online Pika/Luma**) with live progress + stop |
 | ✂️ **Video Editor** | Text overlay, background music, combine videos, loop, speed adjustment |
-| 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation when no GPU is available (keys stored in `config.json`) |
-| ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management |
+| 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver** |
+| ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management, webhook server |
+| 🎬 **Tutorial** | See [`docs/tutorial_video_script.md`](docs/tutorial_video_script.md) — a full scene-by-scene walkthrough using only free tools |
 
 ## 🛠 Requirements
 

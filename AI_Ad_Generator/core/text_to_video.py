@@ -84,6 +84,66 @@ class TextToVideoGenerator:
             print(f"CogVideoX load error: {e}")
             return False
 
+    def load_mochi(self):
+        """Load Mochi 1 (genmo/mochi-1-preview) text-to-video."""
+        try:
+            from diffusers import MochiPipeline
+
+            model_path = os.path.join(MODELS_DIR, "mochi")
+            if not os.path.exists(model_path):
+                model_path = "genmo/mochi-1-preview"
+
+            pipe = MochiPipeline.from_pretrained(
+                model_path, variant="bf16", torch_dtype=torch.bfloat16)
+            if torch.cuda.is_available():
+                pipe.enable_model_cpu_offload()
+            self.pipe = pipe
+            self.current_model = "mochi"
+            return True
+        except Exception as e:
+            print(f"Mochi load error: {e}")
+            return False
+
+    def load_hunyuanvideo(self):
+        """Load HunyuanVideo (tencent/HunyuanVideo) text-to-video."""
+        try:
+            from diffusers import HunyuanVideoPipeline
+
+            model_path = os.path.join(MODELS_DIR, "hunyuanvideo")
+            if not os.path.exists(model_path):
+                model_path = "tencent/HunyuanVideo"
+
+            pipe = HunyuanVideoPipeline.from_pretrained(
+                model_path, torch_dtype=torch.float16)
+            if torch.cuda.is_available():
+                pipe.enable_model_cpu_offload()
+            self.pipe = pipe
+            self.current_model = "hunyuanvideo"
+            return True
+        except Exception as e:
+            print(f"HunyuanVideo load error: {e}")
+            return False
+
+    def load_ltx(self):
+        """Load LTX-Video (Lightricks/LTX-Video) text-to-video."""
+        try:
+            from diffusers import LTXVideoPipeline
+
+            model_path = os.path.join(MODELS_DIR, "ltx_video")
+            if not os.path.exists(model_path):
+                model_path = "Lightricks/LTX-Video"
+
+            pipe = LTXVideoPipeline.from_pretrained(
+                model_path, torch_dtype=torch.bfloat16)
+            if torch.cuda.is_available():
+                pipe.enable_model_cpu_offload()
+            self.pipe = pipe
+            self.current_model = "ltx_video"
+            return True
+        except Exception as e:
+            print(f"LTX-Video load error: {e}")
+            return False
+
     def generate(self, prompt, negative_prompt="", num_frames=24, width=512, height=512,
                 num_steps=DEFAULT_STEPS, guidance_scale=DEFAULT_GUIDANCE,
                 seed=-1, progress_callback=None, model="zeroscope"):
@@ -100,6 +160,12 @@ class TextToVideoGenerator:
                 self.load_cogvideox()
             elif model == "modelscope":
                 self.load_modelscope()
+            elif model == "mochi":
+                self.load_mochi()
+            elif model == "hunyuanvideo":
+                self.load_hunyuanvideo()
+            elif model == "ltx_video":
+                self.load_ltx()
 
         if self.pipe is None:
             raise RuntimeError("Failed to load model")
@@ -146,6 +212,48 @@ class TextToVideoGenerator:
                     num_frames=min(num_frames, 16),
                     height=256,
                     width=256,
+                    num_inference_steps=num_steps,
+                    guidance_scale=guidance_scale,
+                    generator=generator,
+                )
+                frames = result.frames[0]
+
+            elif self.current_model == "mochi":
+                # Mochi is trained at 768x480 and prefers bf16.
+                result = self.pipe(
+                    prompt=prompt,
+                    num_frames=min(num_frames, 84),
+                    height=480,
+                    width=768,
+                    num_inference_steps=num_steps,
+                    guidance_scale=guidance_scale,
+                    generator=generator,
+                )
+                frames = result.frames[0]
+
+            elif self.current_model == "hunyuanvideo":
+                # HunyuanVideo expects height/width multiples of 16.
+                result = self.pipe(
+                    prompt=prompt,
+                    num_frames=min(num_frames, 30),
+                    height=512,
+                    width=512,
+                    num_inference_steps=num_steps,
+                    guidance_scale=guidance_scale,
+                    generator=generator,
+                )
+                frames = result.frames[0]
+
+            elif self.current_model == "ltx_video":
+                # LTX-Video needs height/width multiples of 32 and
+                # num_frames = 8*k + 1.
+                h, w = 512, 768
+                nf = 8 * max(int(num_frames // 8), 1) + 1
+                result = self.pipe(
+                    prompt=prompt,
+                    num_frames=nf,
+                    height=h,
+                    width=w,
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,

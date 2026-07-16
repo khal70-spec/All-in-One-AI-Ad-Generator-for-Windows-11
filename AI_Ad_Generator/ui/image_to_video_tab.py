@@ -4,6 +4,7 @@ from core.image_to_video import ImageToVideoGenerator
 from core.background_remover import BackgroundRemover
 from core.image_editor import ImageEditor
 from core.text_to_image import TextToImageGenerator
+from core.upscaler import UpscalerClient
 from PIL import Image, ImageTk
 from tkinter import filedialog
 import threading
@@ -20,6 +21,7 @@ class ImageToVideoTab:
         self.bg_remover = BackgroundRemover()
         self.image_editor = ImageEditor()
         self.t2i = TextToImageGenerator(model_manager)
+        self.upscaler = UpscalerClient()
         self.selected_image = None
         self.is_generating = False
         self.is_img_gen = False
@@ -99,6 +101,11 @@ class ImageToVideoTab:
                        variable=self.enhance_var,
                        fg_color=COLORS["accent"]).pack(anchor="w", padx=20, pady=2)
 
+        self.upscale_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(left_panel, text="Upscale first (free online)",
+                       variable=self.upscale_var,
+                       fg_color=COLORS["accent"]).pack(anchor="w", padx=20, pady=2)
+
         # Model Selection
         ctk.CTkLabel(left_panel, text="Model:",
                      font=FONTS["subheading"]).pack(anchor="w", padx=10, pady=(15, 5))
@@ -107,11 +114,20 @@ class ImageToVideoTab:
         model_menu = ctk.CTkOptionMenu(
             left_panel,
             variable=self.model_var,
-            values=["svd", "animatediff"],
+            values=["svd", "animatediff", "online (Pika/Luma)"],
             fg_color=COLORS["entry_bg"],
             button_color=COLORS["accent"],
         )
         model_menu.pack(fill="x", padx=10, pady=5)
+
+        self.provider_var = ctk.StringVar(value="pika")
+        ctk.CTkOptionMenu(
+            left_panel,
+            variable=self.provider_var,
+            values=["pika", "luma"],
+            fg_color=COLORS["entry_bg"],
+            button_color=COLORS["accent"],
+        ).pack(fill="x", padx=10, pady=5)
 
         # Settings
         settings_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
@@ -279,6 +295,28 @@ class ImageToVideoTab:
 
         def run():
             try:
+                model = self.model_var.get()
+
+                # ---- Online image-to-video (Pika / Luma) ----
+                if model == "online (Pika/Luma)":
+                    if not self.selected_image:
+                        self.parent.after(
+                            0, lambda: self.progress_label.configure(
+                                text="⚠️ Select an image first!"))
+                        return
+                    self._update_progress(5, "Submitting to cloud provider...")
+                    from core.online_apis import get_provider
+                    provider = get_provider(self.provider_var.get())
+                    prompt = (self.gen_prompt_entry.get().strip()
+                             or "product advertisement, smooth motion, professional")
+                    out = provider.generate(
+                        prompt=prompt,
+                        image_path=self.selected_image,
+                        progress_callback=self._update_progress,
+                    )
+                    self.parent.after(0, lambda: self._on_complete(out))
+                    return
+
                 image_path = self.selected_image
 
                 # Process image
@@ -290,6 +328,10 @@ class ImageToVideoTab:
                     self._update_progress(10, "Enhancing image...")
                     image_path = self.image_editor.enhance_image(
                         image_path, brightness=1.05, contrast=1.1, sharpness=1.2)
+
+                if self.upscale_var.get():
+                    self._update_progress(15, "Upscaling image (online)...")
+                    image_path = self.upscaler.upscale_image(image_path)
 
                 output = self.generator.generate_from_image(
                     image_path=image_path,

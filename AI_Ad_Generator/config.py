@@ -58,6 +58,24 @@ MODELS = {
         "type": "text_to_video",
         "vram": 8,
     },
+    "mochi": {
+        "name": "Mochi 1",
+        "repo": "genmo/mochi-1-preview",
+        "type": "text_to_video",
+        "vram": 24,
+    },
+    "hunyuanvideo": {
+        "name": "HunyuanVideo",
+        "repo": "tencent/HunyuanVideo",
+        "type": "text_to_video",
+        "vram": 24,
+    },
+    "ltx_video": {
+        "name": "LTX-Video",
+        "repo": "Lightricks/LTX-Video",
+        "type": "text_to_video",
+        "vram": 12,
+    },
 }
 
 # Video Settings

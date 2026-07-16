@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from config import MODELS, USER_SETTINGS, save_settings, ONLINE_PROVIDERS
+from core.webhook_server import WebhookReceiver
 import threading
 import os
 
@@ -11,6 +12,7 @@ class SettingsTab:
     def __init__(self, parent, model_manager):
         self.parent = parent
         self.model_manager = model_manager
+        self.webhook = None
         self._create_ui()
 
     def _create_ui(self):
@@ -186,6 +188,74 @@ class SettingsTab:
             fg_color=COLORS["accent"],
             command=self._save_api_keys,
         ).pack(fill="x", padx=15, pady=(10, 15))
+
+        # ============ WEBHOOK RECEIVER ============
+        wh_frame = ctk.CTkFrame(main_frame, fg_color=COLORS["bg_medium"],
+                               corner_radius=10)
+        wh_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(wh_frame, text="🔔 Webhook Receiver",
+                     font=FONTS["heading"]).pack(pady=(15, 5))
+
+        ctk.CTkLabel(wh_frame,
+                     text="Start a local server to receive Pika/Luma completion "
+                          "callbacks. Use its URL as the webhook_url when generating "
+                          "online (expose it via ngrok/LAN for cloud providers).",
+                     font=FONTS["small"],
+                     text_color=COLORS["text_secondary"]).pack(padx=20, pady=(0, 10))
+
+        row = ctk.CTkFrame(wh_frame, fg_color="transparent")
+        row.pack(fill="x", padx=15, pady=4)
+        ctk.CTkLabel(row, text="Port:", font=FONTS["body"]).pack(side="left")
+        self.wh_port = ctk.CTkEntry(row, width=80, fg_color=COLORS["entry_bg"])
+        self.wh_port.insert(0, "8000")
+        self.wh_port.pack(side="left", padx=10)
+        self.wh_start = ctk.CTkButton(row, text="▶ Start", width=90,
+                                    fg_color=COLORS["success"],
+                                    command=self._start_webhook)
+        self.wh_start.pack(side="left", padx=5)
+        self.wh_stop = ctk.CTkButton(row, text="■ Stop", width=90,
+                                   fg_color=COLORS["error"],
+                                   command=self._stop_webhook, state="disabled")
+        self.wh_stop.pack(side="left", padx=5)
+
+        self.wh_url = ctk.CTkLabel(wh_frame, text="URL: (not started)",
+                                  font=FONTS["small"],
+                                  text_color=COLORS["text_secondary"])
+        self.wh_url.pack(padx=15, pady=(0, 5))
+
+        self.wh_log = ctk.CTkTextbox(wh_frame, height=90,
+                                    fg_color=COLORS["bg_dark"],
+                                    font=("Consolas", 10))
+        self.wh_log.pack(fill="x", padx=15, pady=(0, 15))
+
+    def _wh_log(self, msg):
+        self.wh_log.insert("end", msg + "\n")
+        self.wh_log.see("end")
+
+    def _start_webhook(self):
+        try:
+            port = int(self.wh_port.get())
+        except ValueError:
+            self.wh_url.configure(text="URL: invalid port")
+            return
+        if self.webhook is None:
+            self.webhook = WebhookReceiver(port=port, log_callback=self._wh_log)
+        else:
+            self.webhook.port = port
+        self.webhook.start()
+        self.wh_url.configure(text=f"URL: {self.webhook.url} (expose via ngrok/LAN)")
+        self.wh_start.configure(state="disabled")
+        self.wh_stop.configure(state="normal")
+        self._wh_log("Webhook receiver started.")
+
+    def _stop_webhook(self):
+        if self.webhook is not None:
+            self.webhook.stop()
+        self.wh_start.configure(state="normal")
+        self.wh_stop.configure(state="disabled")
+        self.wh_url.configure(text="URL: (stopped)")
+        self._wh_log("Webhook receiver stopped.")
 
     def _save_api_keys(self):
         for key, entry in self.api_entries.items():
