@@ -35,6 +35,7 @@ AI_Ad_Generator/
 │   ├── editor_tab.py        # Video editor tab
 │   ├── batch_tab.py         # Batch generation tab
 │   ├── settings_tab.py      # System info + model manager + API keys + webhooks
+│   ├── gallery_tab.py       # Outputs browser (thumbnails)
 │   └── styles.py            # Colors & fonts theme
 ├── docs/
 │   └── tutorial_video_script.md  # Scene-by-scene YouTube/social tutorial script
@@ -55,6 +56,7 @@ AI_Ad_Generator/
 | 🔁 **Batch** | Run many products/images in one queue (Text→Video, Image→Video, Image Gen, **Online Pika/Luma**) with live progress + stop |
 | ✂️ **Video Editor** | Text overlay, background music, combine videos, loop, speed adjustment |
 | 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver** |
+| 🖼 **Gallery** | Browse every generated video/image as a thumbnail grid with one-click open |
 | ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management, webhook server |
 | 🎬 **Tutorial** | See [`docs/tutorial_video_script.md`](docs/tutorial_video_script.md) — a full scene-by-scene walkthrough using only free tools |
 

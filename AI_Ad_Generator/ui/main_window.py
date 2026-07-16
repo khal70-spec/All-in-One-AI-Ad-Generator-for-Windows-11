@@ -6,6 +6,7 @@ from ui.prompt_tab import PromptTab
 from ui.editor_tab import EditorTab
 from ui.settings_tab import SettingsTab
 from ui.batch_tab import BatchTab
+from ui.gallery_tab import GalleryTab
 from core.model_manager import ModelManager
 from core.prompt_generator import PromptGenerator
 from config import APP_NAME, APP_VERSION
@@ -84,6 +85,7 @@ class MainWindow:
         tab4 = self.tabview.add("✂️ Video Editor")
         tab5 = self.tabview.add("⚙️ Settings & Models")
         tab6 = self.tabview.add("🔁 Batch")
+        tab7 = self.tabview.add("🖼 Gallery")
 
         # Initialize tab content
         self.text_to_video_tab = TextToVideoTab(tab1, self.model_manager, self.prompt_generator)
@@ -92,6 +94,7 @@ class MainWindow:
         self.editor_tab = EditorTab(tab4)
         self.settings_tab = SettingsTab(tab5, self.model_manager)
         self.batch_tab = BatchTab(tab6, self.model_manager, self.prompt_generator)
+        self.gallery_tab = GalleryTab(tab7)
 
         # ============ STATUS BAR ============
         status_frame = ctk.CTkFrame(self.root, height=30, corner_radius=0,
