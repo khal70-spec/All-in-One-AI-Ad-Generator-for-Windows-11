@@ -5,6 +5,8 @@ from core.background_remover import BackgroundRemover
 from core.image_editor import ImageEditor
 from core.text_to_image import TextToImageGenerator
 from core.upscaler import UpscalerClient
+from core.utils import open_path
+from config import get_ui_pref, set_ui_pref
 from PIL import Image, ImageTk
 from tkinter import filedialog
 import threading
@@ -13,6 +15,8 @@ import os
 
 class ImageToVideoTab:
     """Image to Video generation tab"""
+
+    _PREFS = "image_to_video"  # key under config.json -> ui_prefs
 
     def __init__(self, parent, model_manager):
         self.parent = parent
@@ -25,8 +29,10 @@ class ImageToVideoTab:
         self.selected_image = None
         self.is_generating = False
         self.is_img_gen = False
+        self._cancel_requested = False
 
         self._create_ui()
+        self._restore_prefs()
 
     def _create_ui(self):
         main_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
@@ -198,7 +204,19 @@ class ImageToVideoTab:
             hover_color=COLORS["accent_hover"],
             command=self._generate,
         )
-        self.generate_btn.pack(fill="x", padx=10, pady=15)
+        self.generate_btn.pack(fill="x", padx=10, pady=(15, 5))
+
+        # Cancel button (enabled only while generating)
+        self.cancel_btn = ctk.CTkButton(
+            left_panel,
+            text="⏹ Cancel",
+            font=FONTS["body"],
+            height=34,
+            fg_color=COLORS["error"],
+            state="disabled",
+            command=self._cancel,
+        )
+        self.cancel_btn.pack(fill="x", padx=10, pady=(0, 10))
 
         # Progress
         self.progress_bar = ctk.CTkProgressBar(left_panel, progress_color=COLORS["accent"])
@@ -279,21 +297,30 @@ class ImageToVideoTab:
             return
 
         self.is_img_gen = True
+        self._cancel_requested = False
+        self.cancel_btn.configure(state="normal")
         self.progress_label.configure(text="🎨 Generating image...")
 
         def run():
             try:
-                out = self.t2i.generate(prompt=prompt, progress_callback=self._update_progress)
+                out = self.t2i.generate(
+                    prompt=prompt, progress_callback=self._update_progress,
+                    cancel_check=lambda: self._cancel_requested)
                 self.selected_image = out
                 self.parent.after(0, lambda: self._show_image_preview(out))
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Image ready: {os.path.basename(out)}"))
             except Exception as e:
                 msg = str(e)
-                self.parent.after(0, lambda m=msg: self.progress_label.configure(
-                    text=f"❌ Image error: {m}"))
+                if "Cancelled by user" in msg:
+                    self.parent.after(0, lambda: self.progress_label.configure(
+                        text="⏹ Cancelled by user"))
+                else:
+                    self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                        text=f"❌ Image error: {m}"))
             finally:
                 self.is_img_gen = False
+                self.parent.after(0, lambda: self.cancel_btn.configure(state="disabled"))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -303,6 +330,41 @@ class ImageToVideoTab:
             return int(self.seed_entry.get().strip())
         except (ValueError, AttributeError):
             return -1
+
+    # ------------------------------------------------------------------ #
+    # Preferences (restored from config.json on launch)
+    # ------------------------------------------------------------------ #
+    def _restore_prefs(self):
+        p = self._PREFS
+        self.model_var.set(get_ui_pref(p, "model", "svd"))
+        self.provider_var.set(get_ui_pref(p, "provider", "pika"))
+        frames = float(get_ui_pref(p, "frames", 25))
+        motion = float(get_ui_pref(p, "motion", 127))
+        noise = float(get_ui_pref(p, "noise", 0.02))
+        self.frames_slider.set(frames)
+        self.frames_lbl.configure(text=str(int(frames)))
+        self.motion_slider.set(motion)
+        self.motion_lbl.configure(text=str(int(motion)))
+        self.noise_slider.set(noise)
+        self.noise_lbl.configure(text=f"{noise:.2f}")
+        self.remove_bg_var.set(bool(get_ui_pref(p, "remove_bg", False)))
+        self.enhance_var.set(bool(get_ui_pref(p, "enhance", True)))
+        self.upscale_var.set(bool(get_ui_pref(p, "upscale", False)))
+        self.sound_voice_var.set(bool(get_ui_pref(p, "sound_voice", True)))
+        self.sound_music_var.set(bool(get_ui_pref(p, "sound_music", True)))
+
+    def _save_prefs(self):
+        p = self._PREFS
+        set_ui_pref(p, "model", self.model_var.get())
+        set_ui_pref(p, "provider", self.provider_var.get())
+        set_ui_pref(p, "frames", int(self.frames_slider.get()))
+        set_ui_pref(p, "motion", int(self.motion_slider.get()))
+        set_ui_pref(p, "noise", round(float(self.noise_slider.get()), 3))
+        set_ui_pref(p, "remove_bg", self.remove_bg_var.get())
+        set_ui_pref(p, "enhance", self.enhance_var.get())
+        set_ui_pref(p, "upscale", self.upscale_var.get())
+        set_ui_pref(p, "sound_voice", self.sound_voice_var.get())
+        set_ui_pref(p, "sound_music", self.sound_music_var.get())
 
     def _generate(self):
         if self.is_generating or not self.selected_image:
@@ -325,8 +387,11 @@ class ImageToVideoTab:
         seed = self._get_seed()
         source_image = self.selected_image
 
+        self._save_prefs()
         self.is_generating = True
+        self._cancel_requested = False
         self.generate_btn.configure(state="disabled", text="⏳ Generating...")
+        self.cancel_btn.configure(state="normal")
 
         def run():
             try:
@@ -367,6 +432,7 @@ class ImageToVideoTab:
                     seed=seed,
                     model=model,
                     progress_callback=self._update_progress,
+                    cancel_check=lambda: self._cancel_requested,
                 )
 
                 self.parent.after(0, lambda: self._on_complete(output))
@@ -400,9 +466,15 @@ class ImageToVideoTab:
         self.parent.after(0, lambda: self.progress_bar.set(value / 100))
         self.parent.after(0, lambda: self.progress_label.configure(text=message))
 
+    def _cancel(self):
+        self._cancel_requested = True
+        self.cancel_btn.configure(state="disabled")
+        self.progress_label.configure(text="⏹ Cancelling after current step...")
+
     def _on_complete(self, output_path):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 ANIMATE IMAGE")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(1)
         self.progress_label.configure(text="✅ Complete!")
         self.output_label.configure(text=f"Saved: {output_path}")
@@ -462,13 +534,17 @@ class ImageToVideoTab:
     def _on_error(self, error):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 ANIMATE IMAGE")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(0)
-        self.progress_label.configure(text=f"❌ Error: {error}")
+        if "Cancelled by user" in str(error):
+            self.progress_label.configure(text="⏹ Cancelled by user")
+        else:
+            self.progress_label.configure(text=f"❌ Error: {error}")
 
     def _open_output(self):
         from config import OUTPUTS_DIR
-        os.startfile(OUTPUTS_DIR)
+        open_path(OUTPUTS_DIR)
 
     def _play_video(self):
         if hasattr(self, 'last_output') and os.path.exists(self.last_output):
-            os.startfile(self.last_output)
+            open_path(self.last_output)

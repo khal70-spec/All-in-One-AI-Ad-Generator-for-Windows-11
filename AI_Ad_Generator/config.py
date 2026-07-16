@@ -162,6 +162,7 @@ USER_SETTINGS = {
     "pika_api_key": "",
     "luma_api_key": "",
     "use_online_fallback": False,
+    "ui_prefs": {},  # per-tab widget values, restored on next launch
 }
 
 
@@ -184,6 +185,25 @@ def save_settings():
             json.dump(USER_SETTINGS, f, indent=2)
     except Exception:
         pass
+
+
+def get_ui_pref(section, key, default=None):
+    """Read a persisted per-tab widget value."""
+    prefs = USER_SETTINGS.get("ui_prefs")
+    if not isinstance(prefs, dict):
+        return default
+    return prefs.get(section, {}).get(key, default)
+
+
+def set_ui_pref(section, key, value):
+    """Persist a per-tab widget value (writes config.json on change)."""
+    prefs = USER_SETTINGS.setdefault("ui_prefs", {})
+    if not isinstance(prefs, dict):
+        prefs = USER_SETTINGS["ui_prefs"] = {}
+    section_prefs = prefs.setdefault(section, {})
+    if section_prefs.get(key) != value:
+        section_prefs[key] = value
+        save_settings()
 
 
 # Load any previously saved settings at import time

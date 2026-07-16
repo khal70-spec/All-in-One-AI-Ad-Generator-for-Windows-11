@@ -4,6 +4,9 @@ import time
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from config import OUTPUTS_DIR
+from .logger import get_logger
+
+log = get_logger("webhook")
 
 
 class WebhookReceiver:
@@ -39,6 +42,7 @@ class WebhookReceiver:
         return None
 
     def _handle(self, data):
+        log.info("Webhook POST received")
         if self.log_callback:
             try:
                 pretty = json.dumps(data)[:400]

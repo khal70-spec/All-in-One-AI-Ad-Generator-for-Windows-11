@@ -1,7 +1,8 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from core.text_to_video import TextToVideoGenerator
-from config import AD_TEMPLATES
+from core.utils import open_path
+from config import AD_TEMPLATES, get_ui_pref, set_ui_pref
 import threading
 import os
 
@@ -9,14 +10,18 @@ import os
 class TextToVideoTab:
     """Text to Video generation tab"""
 
+    _PREFS = "text_to_video"  # key under config.json -> ui_prefs
+
     def __init__(self, parent, model_manager, prompt_generator):
         self.parent = parent
         self.model_manager = model_manager
         self.prompt_generator = prompt_generator
         self.generator = TextToVideoGenerator(model_manager)
         self.is_generating = False
+        self._cancel_requested = False
 
         self._create_ui()
+        self._restore_prefs()
 
     def _create_ui(self):
         # Main container with two columns
@@ -190,7 +195,19 @@ class TextToVideoTab:
             hover_color=COLORS["accent_hover"],
             command=self._generate,
         )
-        self.generate_btn.pack(fill="x", padx=10, pady=15)
+        self.generate_btn.pack(fill="x", padx=10, pady=(15, 5))
+
+        # Cancel button (enabled only while generating)
+        self.cancel_btn = ctk.CTkButton(
+            left_panel,
+            text="⏹ Cancel",
+            font=FONTS["body"],
+            height=34,
+            fg_color=COLORS["error"],
+            state="disabled",
+            command=self._cancel,
+        )
+        self.cancel_btn.pack(fill="x", padx=10, pady=(0, 10))
 
         # Progress
         self.progress_bar = ctk.CTkProgressBar(left_panel, progress_color=COLORS["accent"])
@@ -276,6 +293,35 @@ class TextToVideoTab:
         except (ValueError, AttributeError):
             return -1
 
+    # ------------------------------------------------------------------ #
+    # Preferences (restored from config.json on launch)
+    # ------------------------------------------------------------------ #
+    def _restore_prefs(self):
+        p = self._PREFS
+        self.model_var.set(get_ui_pref(p, "model", "zeroscope"))
+        self.size_var.set(get_ui_pref(p, "size", "512x512"))
+        steps = float(get_ui_pref(p, "steps", 25))
+        guidance = float(get_ui_pref(p, "guidance", 7.5))
+        frames = float(get_ui_pref(p, "frames", 24))
+        self.steps_slider.set(steps)
+        self.steps_label.configure(text=str(int(steps)))
+        self.guidance_slider.set(guidance)
+        self.guidance_label.configure(text=f"{guidance:.1f}")
+        self.frames_slider.set(frames)
+        self.frames_label.configure(text=str(int(frames)))
+        self.sound_voice_var.set(bool(get_ui_pref(p, "sound_voice", True)))
+        self.sound_music_var.set(bool(get_ui_pref(p, "sound_music", True)))
+
+    def _save_prefs(self):
+        p = self._PREFS
+        set_ui_pref(p, "model", self.model_var.get())
+        set_ui_pref(p, "size", self.size_var.get())
+        set_ui_pref(p, "steps", int(self.steps_slider.get()))
+        set_ui_pref(p, "guidance", round(float(self.guidance_slider.get()), 2))
+        set_ui_pref(p, "frames", int(self.frames_slider.get()))
+        set_ui_pref(p, "sound_voice", self.sound_voice_var.get())
+        set_ui_pref(p, "sound_music", self.sound_music_var.get())
+
     def _generate(self):
         if self.is_generating:
             return
@@ -296,8 +342,11 @@ class TextToVideoTab:
         seed = self._get_seed()
         model = self.model_var.get()
 
+        self._save_prefs()
         self.is_generating = True
+        self._cancel_requested = False
         self.generate_btn.configure(state="disabled", text="⏳ Generating...")
+        self.cancel_btn.configure(state="normal")
 
         def run():
             try:
@@ -312,6 +361,7 @@ class TextToVideoTab:
                     seed=seed,
                     model=model,
                     progress_callback=self._update_progress,
+                    cancel_check=lambda: self._cancel_requested,
                 )
 
                 self.parent.after(0, lambda: self._on_complete(output))
@@ -342,9 +392,15 @@ class TextToVideoTab:
         self.parent.after(0, lambda: self.progress_bar.set(value / 100))
         self.parent.after(0, lambda: self.progress_label.configure(text=message))
 
+    def _cancel(self):
+        self._cancel_requested = True
+        self.cancel_btn.configure(state="disabled")
+        self.progress_label.configure(text="⏹ Cancelling after current step...")
+
     def _on_complete(self, output_path):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 GENERATE VIDEO")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(1)
         self.progress_label.configure(text="✅ Generation complete!")
         self.output_label.configure(text=f"Saved: {output_path}")
@@ -404,13 +460,17 @@ class TextToVideoTab:
     def _on_error(self, error):
         self.is_generating = False
         self.generate_btn.configure(state="normal", text="🚀 GENERATE VIDEO")
+        self.cancel_btn.configure(state="disabled")
         self.progress_bar.set(0)
-        self.progress_label.configure(text=f"❌ Error: {error}")
+        if "Cancelled by user" in str(error):
+            self.progress_label.configure(text="⏹ Cancelled by user")
+        else:
+            self.progress_label.configure(text=f"❌ Error: {error}")
 
     def _open_output_folder(self):
         from config import OUTPUTS_DIR
-        os.startfile(OUTPUTS_DIR)
+        open_path(OUTPUTS_DIR)
 
     def _play_video(self):
         if hasattr(self, 'last_output') and os.path.exists(self.last_output):
-            os.startfile(self.last_output)
+            open_path(self.last_output)

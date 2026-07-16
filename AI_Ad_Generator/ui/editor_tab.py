@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
 from core.video_editor import VideoEditor
+from core.utils import open_path
 from config import OUTPUTS_DIR
 from tkinter import filedialog
 import threading
@@ -200,7 +201,7 @@ class EditorTab:
 
         ctk.CTkButton(btn_frame, text="📂 Open Output",
                       fg_color=COLORS["bg_light"],
-                      command=lambda: os.startfile(OUTPUTS_DIR)).pack(side="left", padx=5)
+                      command=lambda: open_path(OUTPUTS_DIR)).pack(side="left", padx=5)
 
     def _select_video(self):
         path = filedialog.askopenfilename(

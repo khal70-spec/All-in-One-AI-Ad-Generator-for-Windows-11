@@ -2,6 +2,9 @@ import os
 import time
 import requests
 from config import ONLINE_PROVIDERS, USER_SETTINGS, OUTPUTS_DIR
+from .logger import get_logger
+
+log = get_logger("online")
 
 
 class OnlineProvider:
@@ -182,5 +185,5 @@ def try_fallback(prompt=None, image_path=None, progress_callback=None):
                     prompt=prompt, image_path=image_path,
                     progress_callback=progress_callback)
             except Exception as e:
-                print(f"Cloud fallback ({key}) failed: {e}")
+                log.error("Cloud fallback (%s) failed: %s", key, e)
     raise RuntimeError("No online provider configured for fallback")

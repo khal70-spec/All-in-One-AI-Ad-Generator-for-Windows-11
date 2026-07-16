@@ -23,10 +23,14 @@ AI_Ad_Generator/
 │   ├── image_to_video.py    # Stable Video Diffusion / AnimateDiff
 │   ├── text_to_image.py     # Stable Diffusion XL (product images)
 │   ├── video_editor.py      # Cut, text, music, combine, loop, speed
-│   ├── batch.py             # Queue many jobs across the engines
+│   ├── batch.py             # Queue many jobs across the engines (+ JSON run summary)
 │   ├── online_apis.py       # Pika / Luma cloud video generation (+ image2video, webhooks)
 │   ├── upscaler.py          # Free online image upscaling (upscale.media)
-│   └── webhook_server.py    # Local webhook receiver for provider callbacks
+│   ├── webhook_server.py    # Local webhook receiver for provider callbacks
+│   ├── utils.py             # Cross-platform open_path, size formatting, slugs
+│   ├── logger.py            # Rotating file logging (temp/app.log)
+│   ├── progress.py          # Per-step progress + generation cancellation
+│   └── ffmpeg_setup.py      # Locate bundled ffmpeg for moviepy/pydub
 ├── ui/                  # CustomTkinter front-end
 │   ├── main_window.py       # Window, header, tabview, status bar
 │   ├── text_to_video_tab.py # Text → Video generation tab
@@ -39,6 +43,8 @@ AI_Ad_Generator/
 │   └── styles.py            # Colors & fonts theme
 ├── docs/
 │   └── tutorial_video_script.md  # Scene-by-scene YouTube/social tutorial script
+├── tests/
+│   └── smoke_test.py    # Offline smoke tests (no GPU/torch needed)
 ├── models/              # Downloaded model weights (created at runtime)
 ├── outputs/             # Generated videos (created at runtime)
 ├── temp/                # Intermediate files (created at runtime)
@@ -58,7 +64,12 @@ AI_Ad_Generator/
 | 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver**; **cloud fallback** toggle if local generation fails |
 | 🖼 **Gallery** | Browse every generated video/image as a thumbnail grid with one-click open |
 | 🔊 **Sound** | Every generated video gets a voiceover (offline TTS via `pyttsx3`) + a synthesized royalty-free background music bed, muxed in automatically (toggle per tab and in Batch) |
-| ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management, webhook server |
+| 🧾 **Reproducibility** | Every generated video/image gets a **`.json` metadata sidecar** (prompt, seed, model, settings, timestamp) |
+| 💾 **Persistence** | Your tab preferences (model, steps, guidance, frames, sound toggles) are **restored on the next launch** |
+| ⏹ **Control** | **Cancel button** on Text→Video, Image→Video and SDXL image generation stops mid-run between diffusion steps |
+| ⚙️ **Settings** | One-click model download **and delete**, on-disk size + free-space display, **disk-space pre-checks**, GPU/CPU auto-detect, API-key management, webhook server |
+| 📜 **Logging** | Rotating log at `temp/app.log` for every subsystem — no more lost console errors |
+| 🖥 **Cross-platform** | `open_path()` helper — Open/Play buttons work on Windows, macOS and Linux |
 | 🎬 **Tutorial** | See [`docs/tutorial_video_script.md`](docs/tutorial_video_script.md) — a full scene-by-scene walkthrough using only free tools |
 
 ## 🛠 Requirements
@@ -73,9 +84,10 @@ AI_Ad_Generator/
    sure **"Add Python to PATH"** is checked.
 2. Copy/clone all files into a folder named `AI_Ad_Generator`.
 3. **Double-click `install.bat`** — this will:
-   - Create a virtual environment (`venv`)
+   - Create a virtual environment (`venv`) — reused if it already exists
    - Upgrade pip
-   - Install PyTorch with CUDA 12.1
+   - Install PyTorch — auto-detects your hardware: CUDA 12.1 build when an
+     NVIDIA GPU is present, CPU build otherwise
    - Install all dependencies from `requirements.txt`
    - Create the `models/`, `outputs/`, `temp/`, `assets/` folders
 4. **Double-click `start.bat`** to launch the app.
@@ -119,10 +131,44 @@ This uses PyInstaller to produce `dist/AI_Ad_Generator/AI_Ad_Generator.exe`.
 - `CogVideoX` needs ~16 GB VRAM; `ZeroScope` / `SVD` / `AnimateDiff` work with
   ~8 GB. **FP16** precision and **CPU offloading** are applied automatically
   whenever a CUDA GPU is detected, which already minimizes VRAM use.
-- Generated videos are saved to `AI_Ad_Generator/outputs/` as `.mp4`.
-- `os.startfile(...)` calls are Windows-specific; on other OSes the
-  "Open Folder / Play" buttons won't work (the generation pipeline itself is
-  cross-platform).
+- Generated videos are saved to `AI_Ad_Generator/outputs/` as `.mp4`, each
+  with a **`.json` sidecar** storing the prompt, seed, model and settings so
+  you can reproduce any result.
+- The **Open Folder / Play** buttons work on Windows, macOS and Linux via the
+  cross-platform `open_path()` helper.
+- Batch runs write a `batch_summary_<timestamp>.json` report into `outputs/`.
+- Everything is logged to `temp/app.log` (rotating) — check there first when
+  something fails silently.
+
+## 🧪 Running the Tests
+
+The repo ships with offline smoke tests that need **no GPU, no torch and no
+display** (heavy deps are stubbed):
+
+```bat
+cd AI_Ad_Generator
+python tests\smoke_test.py
+```
+
+They verify config persistence, prompt generation, model management
+(VRAM/disk checks), the progress + cancellation plumbing, the online API
+clients, the webhook server, the image editor, metadata sidecars and the
+batch summary writer.
+
+## 🩺 Troubleshooting
+
+- **`torch` installs without CUDA** — `install.bat` auto-detects an NVIDIA
+  GPU via `nvidia-smi`. If yours was missed, reinstall with:
+  `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
+- **Out-of-memory during generation** — close other GPU apps, reduce
+  Frames/Size, or pick a lighter model (ZeroScope/SVD ≈ 8 GB; SDXL ≈ 8 GB;
+  CogVideoX ≈ 16 GB; LTX ≈ 12 GB; Mochi/HunyuanVideo ≈ 24 GB).
+- **A generation looks stuck** — hit **⏹ Cancel**; it stops cleanly between
+  diffusion steps.
+- **Settings/API keys** live in `AI_Ad_Generator/config.json` (git-ignored).
+  Delete it to reset everything to defaults.
+- **Something failed with no popup** — open `temp/app.log`; every subsystem
+  logs there with timestamps.
 
 ## 📄 License
 

@@ -1,6 +1,9 @@
 import os
 from PIL import Image
 from config import TEMP_DIR
+from .logger import get_logger
+
+log = get_logger("bgremove")
 
 
 class BackgroundRemover:
@@ -32,7 +35,7 @@ class BackgroundRemover:
             output_image.save(output_path)
             return output_path
         except Exception as e:
-            print(f"Background removal error: {e}")
+            log.error("Background removal error: %s", e)
             return image_path
 
     def replace_background(self, image_path, bg_color=(255, 255, 255), output_path=None):
@@ -50,5 +53,5 @@ class BackgroundRemover:
             combined.convert("RGB").save(output_path)
             return output_path
         except Exception as e:
-            print(f"Background replace error: {e}")
+            log.error("Background replace error: %s", e)
             return image_path

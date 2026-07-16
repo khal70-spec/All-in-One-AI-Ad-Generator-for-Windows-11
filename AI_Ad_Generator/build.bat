@@ -7,6 +7,8 @@ pip install pyinstaller
 
 echo Building executable...
 pyinstaller --onedir ^
+    --noconfirm ^
+    --clean ^
     --name "AI_Ad_Generator" ^
     --windowed ^
     --add-data "assets;assets" ^

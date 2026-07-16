@@ -1,10 +1,14 @@
 import os
+import json
 import torch
 import numpy as np
 from PIL import Image
 from config import MODELS_DIR, OUTPUTS_DIR, DEFAULT_STEPS, DEFAULT_GUIDANCE
-from .progress import make_step_kwargs
+from .progress import make_step_kwargs, GenerationCancelled
+from .logger import get_logger
 import time
+
+log = get_logger("t2v")
 
 
 class TextToVideoGenerator:
@@ -59,7 +63,7 @@ class TextToVideoGenerator:
             self.current_model = "modelscope"
             return True
         except Exception as e:
-            print(f"ModelScope load error: {e}")
+            log.error("ModelScope load error: %s", e)
             return False
 
     def load_cogvideox(self):
@@ -83,7 +87,7 @@ class TextToVideoGenerator:
             self.current_model = "cogvideox"
             return True
         except Exception as e:
-            print(f"CogVideoX load error: {e}")
+            log.error("CogVideoX load error: %s", e)
             return False
 
     def load_mochi(self):
@@ -103,7 +107,7 @@ class TextToVideoGenerator:
             self.current_model = "mochi"
             return True
         except Exception as e:
-            print(f"Mochi load error: {e}")
+            log.error("Mochi load error: %s", e)
             return False
 
     def load_hunyuanvideo(self):
@@ -123,7 +127,7 @@ class TextToVideoGenerator:
             self.current_model = "hunyuanvideo"
             return True
         except Exception as e:
-            print(f"HunyuanVideo load error: {e}")
+            log.error("HunyuanVideo load error: %s", e)
             return False
 
     def load_ltx(self):
@@ -143,18 +147,23 @@ class TextToVideoGenerator:
             self.current_model = "ltx_video"
             return True
         except Exception as e:
-            print(f"LTX-Video load error: {e}")
+            log.error("LTX-Video load error: %s", e)
             return False
 
     def generate(self, prompt, negative_prompt="", num_frames=24, width=512, height=512,
                 num_steps=DEFAULT_STEPS, guidance_scale=DEFAULT_GUIDANCE,
-                seed=-1, progress_callback=None, model="zeroscope"):
+                seed=-1, progress_callback=None, model="zeroscope",
+                cancel_check=None):
         """Generate video from text"""
 
         # Load model if needed
         if self.current_model != model or self.pipe is None:
             if progress_callback:
                 progress_callback(0, f"Loading {model} model...")
+            warn = self.model_manager.check_vram_fit(model)
+            if warn and progress_callback:
+                progress_callback(1, warn)
+                log.warning(warn)
 
             if model == "zeroscope":
                 self.load_zeroscope()
@@ -181,7 +190,8 @@ class TextToVideoGenerator:
         if seed == -1:
             seed = int(time.time()) % 2**32
         generator = torch.Generator(device=self.model_manager.device).manual_seed(seed)
-        step_kwargs = make_step_kwargs(self.pipe, num_steps, progress_callback)
+        step_kwargs = make_step_kwargs(self.pipe, num_steps, progress_callback,
+                                       cancel_check=cancel_check)
 
         if progress_callback:
             progress_callback(10, "Generating video frames...")
@@ -277,21 +287,39 @@ class TextToVideoGenerator:
             if progress_callback:
                 progress_callback(80, "Saving video...")
 
-            # Save video
-            output_path = self._save_video(frames, seed)
+            # Save video (+ metadata sidecar for reproducibility)
+            output_path = self._save_video(frames, seed, meta={
+                "type": "text_to_video",
+                "model": self.current_model,
+                "prompt": prompt,
+                "negative_prompt": negative_prompt,
+                "num_frames": num_frames,
+                "width": width,
+                "height": height,
+                "num_steps": num_steps,
+                "guidance_scale": guidance_scale,
+                "seed": seed,
+            })
 
             if progress_callback:
                 progress_callback(100, "Complete!")
 
+            log.info("Generated text-to-video: %s", output_path)
             return output_path
 
+        except GenerationCancelled:
+            log.info("Generation cancelled by user")
+            if progress_callback:
+                progress_callback(0, "Cancelled")
+            raise
         except Exception as e:
+            log.error("Generation failed: %s", e)
             if progress_callback:
                 progress_callback(0, f"Error: {str(e)}")
             raise
 
-    def _save_video(self, frames, seed):
-        """Save frames as video file"""
+    def _save_video(self, frames, seed, meta=None):
+        """Save frames as video file (+ optional JSON metadata sidecar)."""
         import imageio
 
         timestamp = int(time.time())
@@ -302,4 +330,18 @@ class TextToVideoGenerator:
             frames = [np.array(f) for f in frames]
 
         imageio.mimwrite(output_path, frames, fps=8, quality=8)
+        self._write_sidecar(output_path, meta)
         return output_path
+
+    @staticmethod
+    def _write_sidecar(media_path, meta):
+        """Write ``<media>.json`` holding the generation parameters."""
+        if not meta:
+            return
+        try:
+            meta = dict(meta)
+            meta["created"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(media_path + ".json", "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            log.warning("Could not write metadata sidecar: %s", e)
