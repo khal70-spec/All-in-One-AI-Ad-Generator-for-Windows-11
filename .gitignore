@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# App runtime data
+AI_Ad_Generator/models/*
+!AI_Ad_Generator/models/.gitkeep
+AI_Ad_Generator/outputs/*
+!AI_Ad_Generator/outputs/.gitkeep
+AI_Ad_Generator/temp/*
+!AI_Ad_Generator/temp/.gitkeep
+
+# Build artifacts
+build/
+dist/
+*.spec
