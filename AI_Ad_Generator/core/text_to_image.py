@@ -2,6 +2,7 @@ import os
 import torch
 import time
 from config import MODELS_DIR, OUTPUTS_DIR, DEFAULT_STEPS, DEFAULT_GUIDANCE
+from .progress import make_step_kwargs
 from PIL import Image
 
 
@@ -61,6 +62,7 @@ class TextToImageGenerator:
             seed = int(time.time()) % 2**32
         device = self._device()
         generator = torch.Generator(device=device).manual_seed(seed)
+        step_kwargs = make_step_kwargs(self.pipe, num_steps, progress_callback)
 
         if progress_callback:
             progress_callback(10, "Generating image...")
@@ -74,6 +76,7 @@ class TextToImageGenerator:
                 num_inference_steps=num_steps,
                 guidance_scale=guidance_scale,
                 generator=generator,
+                **step_kwargs,
             )
             image = result.images[0]
 

@@ -170,3 +170,17 @@ def get_provider(provider_key):
     if provider_key == "luma":
         return LumaClient("luma")
     raise ValueError(f"Provider {provider_key} has no client implementation")
+
+
+def try_fallback(prompt=None, image_path=None, progress_callback=None):
+    """Generate via the first configured online provider (used as a fallback
+    when local GPU generation fails). Raises if no provider key is set."""
+    for key in ("pika", "luma"):
+        if USER_SETTINGS.get(f"{key}_api_key", "").strip():
+            try:
+                return get_provider(key).generate(
+                    prompt=prompt, image_path=image_path,
+                    progress_callback=progress_callback)
+            except Exception as e:
+                print(f"Cloud fallback ({key}) failed: {e}")
+    raise RuntimeError("No online provider configured for fallback")

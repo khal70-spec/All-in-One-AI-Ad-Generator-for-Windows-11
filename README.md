@@ -49,13 +49,13 @@ AI_Ad_Generator/
 
 | Area | Highlights |
 |------|-----------|
-| 📝 **Text to Video** | ZeroScope V2, CogVideoX, **ModelScope T2V**, **Mochi 1**, **HunyuanVideo**, **LTX-Video**, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed |
+| 📝 **Text to Video** | ZeroScope V2, CogVideoX, **ModelScope T2V**, **Mochi 1**, **HunyuanVideo**, **LTX-Video**, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed, **live per-step progress** |
 | 🖼 **Image to Video** | Stable Video Diffusion, AnimateDiff, auto background removal, image enhancement, **free online upscaling**, motion control, **online Pika/Luma image-to-video** |
 | 🎨 **Image Generation** | **Stable Diffusion XL** to create product images from text (then animate them) |
 | 💡 **Prompt Generator** | 8 styles (cinematic/luxury/tech/…), batch variations, quick templates, auto negative prompts |
 | 🔁 **Batch** | Run many products/images in one queue (Text→Video, Image→Video, Image Gen, **Online Pika/Luma**) with live progress + stop |
 | ✂️ **Video Editor** | Text overlay, background music, combine videos, loop, speed adjustment |
-| 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver** |
+| 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation (text + image-to-video, **webhook callbacks**) when no GPU is available; keys stored in `config.json`; built-in **webhook receiver**; **cloud fallback** toggle if local generation fails |
 | 🖼 **Gallery** | Browse every generated video/image as a thumbnail grid with one-click open |
 | ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management, webhook server |
 | 🎬 **Tutorial** | See [`docs/tutorial_video_script.md`](docs/tutorial_video_script.md) — a full scene-by-scene walkthrough using only free tools |
@@ -80,6 +80,14 @@ AI_Ad_Generator/
 4. **Double-click `start.bat`** to launch the app.
 5. Open the **⚙️ Settings & Models** tab and **download the models** you want.
 6. Start creating ads! 🎬
+
+> **Lightweight vs. advanced install:** `requirements.txt` (used by
+> `install.bat`) installs the core stack so the app runs with the original
+> lightweight `diffusers`. The heavier models — **Mochi 1, HunyuanVideo,
+> LTX-Video** — need a newer `diffusers`. After the base install, run
+> **`install_advanced.bat`** (or `pip install -r requirements_advanced.txt`)
+> to enable them. If you skip it, those models still appear in the menus but
+> fail with a clear "upgrade diffusers" message.
 
 ## ▶️ Usage
 

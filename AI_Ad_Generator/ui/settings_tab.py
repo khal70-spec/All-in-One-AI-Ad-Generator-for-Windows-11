@@ -182,6 +182,15 @@ class SettingsTab:
             entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
             self.api_entries[key] = entry
 
+        self.fallback_var = ctk.BooleanVar(
+            value=USER_SETTINGS.get("use_online_fallback", False))
+        ctk.CTkCheckBox(
+            api_frame,
+            text="Use cloud fallback if local generation fails",
+            variable=self.fallback_var,
+            fg_color=COLORS["accent"],
+        ).pack(anchor="w", padx=15, pady=(5, 0))
+
         ctk.CTkButton(
             api_frame,
             text="💾 Save API Keys",
@@ -260,6 +269,7 @@ class SettingsTab:
     def _save_api_keys(self):
         for key, entry in self.api_entries.items():
             USER_SETTINGS[f"{key}_api_key"] = entry.get().strip()
+        USER_SETTINGS["use_online_fallback"] = self.fallback_var.get()
         save_settings()
         self.dl_label.configure(text="✅ API keys saved to config.json")
 

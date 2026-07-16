@@ -290,6 +290,20 @@ class TextToVideoTab:
                 self.parent.after(0, lambda: self._on_complete(output))
 
             except Exception as e:
+                # Optional cloud fallback when local generation fails
+                from config import USER_SETTINGS
+                if USER_SETTINGS.get("use_online_fallback") and prompt:
+                    try:
+                        from core.online_apis import try_fallback
+                        self._update_progress(0, "Local failed — trying cloud...")
+                        out = try_fallback(prompt=prompt,
+                                          progress_callback=self._update_progress)
+                        self.parent.after(0, lambda: self._on_complete(out))
+                        return
+                    except Exception as fe:
+                        self.parent.after(0, lambda: self._on_error(
+                            f"Local: {e}\nCloud: {fe}"))
+                        return
                 self.parent.after(0, lambda: self._on_error(str(e)))
 
         thread = threading.Thread(target=run, daemon=True)

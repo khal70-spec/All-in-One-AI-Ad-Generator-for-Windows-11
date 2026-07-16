@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from PIL import Image
 from config import MODELS_DIR, OUTPUTS_DIR, DEFAULT_STEPS, DEFAULT_GUIDANCE
+from .progress import make_step_kwargs
 import time
 
 
@@ -174,6 +175,7 @@ class TextToVideoGenerator:
         if seed == -1:
             seed = int(time.time()) % 2**32
         generator = torch.Generator(device=self.model_manager.device).manual_seed(seed)
+        step_kwargs = make_step_kwargs(self.pipe, num_steps, progress_callback)
 
         if progress_callback:
             progress_callback(10, "Generating video frames...")
@@ -190,6 +192,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -201,6 +204,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -215,6 +219,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -228,6 +233,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -241,6 +247,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -257,6 +264,7 @@ class TextToVideoGenerator:
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 

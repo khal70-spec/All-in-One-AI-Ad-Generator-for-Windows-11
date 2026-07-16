@@ -346,6 +346,25 @@ class ImageToVideoTab:
                 self.parent.after(0, lambda: self._on_complete(output))
 
             except Exception as e:
+                # Optional cloud fallback when local generation fails
+                from config import USER_SETTINGS
+                if (USER_SETTINGS.get("use_online_fallback")
+                        and model != "online (Pika/Luma)"
+                        and self.selected_image):
+                    try:
+                        from core.online_apis import try_fallback
+                        prompt = (self.gen_prompt_entry.get().strip()
+                                 or "product advertisement, smooth motion, professional")
+                        self._update_progress(0, "Local failed — trying cloud...")
+                        out = try_fallback(prompt=prompt,
+                                          image_path=self.selected_image,
+                                          progress_callback=self._update_progress)
+                        self.parent.after(0, lambda: self._on_complete(out))
+                        return
+                    except Exception as fe:
+                        self.parent.after(0, lambda: self._on_error(
+                            f"Local: {e}\nCloud: {fe}"))
+                        return
                 self.parent.after(0, lambda: self._on_error(str(e)))
 
         thread = threading.Thread(target=run, daemon=True)

@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from PIL import Image
 from config import MODELS_DIR, OUTPUTS_DIR
+from .progress import make_step_kwargs
 import time
 
 
@@ -91,6 +92,7 @@ class ImageToVideoGenerator:
         if seed == -1:
             seed = int(time.time()) % 2**32
         generator = torch.Generator(device="cpu").manual_seed(seed)
+        step_kwargs = make_step_kwargs(self.pipe, num_frames, progress_callback)
 
         if progress_callback:
             progress_callback(20, "Generating video...")
@@ -104,6 +106,7 @@ class ImageToVideoGenerator:
                     motion_bucket_id=motion_bucket_id,
                     noise_aug_strength=noise_aug,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
@@ -113,6 +116,7 @@ class ImageToVideoGenerator:
                     num_frames=num_frames,
                     num_inference_steps=25,
                     generator=generator,
+                    **step_kwargs,
                 )
                 frames = result.frames[0]
 
