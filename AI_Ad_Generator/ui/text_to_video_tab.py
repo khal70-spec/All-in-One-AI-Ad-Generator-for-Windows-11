@@ -269,6 +269,13 @@ class TextToVideoTab:
                 self.guidance_slider.set(template["guidance"])
                 break
 
+    def _get_seed(self):
+        """Parse the seed entry safely; -1 (random) on invalid input."""
+        try:
+            return int(self.seed_entry.get().strip())
+        except (ValueError, AttributeError):
+            return -1
+
     def _generate(self):
         if self.is_generating:
             return
@@ -278,30 +285,39 @@ class TextToVideoTab:
             self.progress_label.configure(text="⚠️ Please enter a prompt!")
             return
 
+        # Snapshot all widget values on the UI thread (tkinter is not
+        # thread-safe, so the worker must not read widgets directly).
+        size = self.size_var.get().split("x")
+        width, height = int(size[0]), int(size[1])
+        negative = self.negative_text.get("0.0", "end").strip()
+        num_frames = int(self.frames_slider.get())
+        num_steps = int(self.steps_slider.get())
+        guidance = float(self.guidance_slider.get())
+        seed = self._get_seed()
+        model = self.model_var.get()
+
         self.is_generating = True
         self.generate_btn.configure(state="disabled", text="⏳ Generating...")
 
         def run():
             try:
-                size = self.size_var.get().split("x")
-                width, height = int(size[0]), int(size[1])
-
                 output = self.generator.generate(
                     prompt=prompt,
-                    negative_prompt=self.negative_text.get("0.0", "end").strip(),
-                    num_frames=int(self.frames_slider.get()),
+                    negative_prompt=negative,
+                    num_frames=num_frames,
                     width=width,
                     height=height,
-                    num_steps=int(self.steps_slider.get()),
-                    guidance_scale=float(self.guidance_slider.get()),
-                    seed=int(self.seed_entry.get()),
-                    model=self.model_var.get(),
+                    num_steps=num_steps,
+                    guidance_scale=guidance,
+                    seed=seed,
+                    model=model,
                     progress_callback=self._update_progress,
                 )
 
                 self.parent.after(0, lambda: self._on_complete(output))
 
             except Exception as e:
+                local_err = str(e)
                 # Optional cloud fallback when local generation fails
                 from config import USER_SETTINGS
                 if USER_SETTINGS.get("use_online_fallback") and prompt:
@@ -313,10 +329,11 @@ class TextToVideoTab:
                         self.parent.after(0, lambda: self._on_complete(out))
                         return
                     except Exception as fe:
-                        self.parent.after(0, lambda: self._on_error(
-                            f"Local: {e}\nCloud: {fe}"))
+                        cloud_err = str(fe)
+                        self.parent.after(0, lambda m=f"Local: {local_err}\nCloud: {cloud_err}":
+                                          self._on_error(m))
                         return
-                self.parent.after(0, lambda: self._on_error(str(e)))
+                self.parent.after(0, lambda m=local_err: self._on_error(m))
 
         thread = threading.Thread(target=run, daemon=True)
         thread.start()
@@ -344,29 +361,25 @@ class TextToVideoTab:
             print(f"Preview error: {e}")
 
         # Optional sound (voiceover + background music)
-        if self.sound_voice_var.get() or self.sound_music_var.get():
+        voice = self.sound_voice_var.get()
+        music = self.sound_music_var.get()
+        if voice or music:
             self.progress_label.configure(text="🔊 Adding sound...")
+            prompt = self.prompt_text.get("0.0", "end").strip()
             threading.Thread(target=self._add_sound,
-                            args=(output_path,), daemon=True).start()
+                            args=(output_path, prompt, voice, music),
+                            daemon=True).start()
 
-    def _add_sound(self, video_path):
+    def _add_sound(self, video_path, prompt, voiceover, music):
         try:
             from core.sound import add_sound_to_video
-            prompt = self.prompt_text.get("0.0", "end").strip()
             out = add_sound_to_video(
                 video_path, prompt=prompt,
-                voiceover=self.sound_voice_var.get(),
-                music=self.sound_music_var.get())
+                voiceover=voiceover,
+                music=music)
             if out and os.path.exists(out):
                 self.last_output = out
-                try:
-                    from core.preview_utils import make_ctk_thumbnail
-                    photo = make_ctk_thumbnail(out)
-                    if photo is not None:
-                        self.preview_label.configure(image=photo, text="")
-                        self.preview_label.image = photo
-                except Exception:
-                    pass
+                self.parent.after(0, lambda: self._refresh_preview(out))
                 self.parent.after(
                     0, lambda: self.progress_label.configure(
                         text="✅ Done — video with sound!"))
@@ -376,6 +389,17 @@ class TextToVideoTab:
         self.parent.after(
             0, lambda: self.progress_label.configure(
                 text="✅ Video ready (sound skipped)"))
+
+    def _refresh_preview(self, video_path):
+        """Update the preview thumbnail. Must run on the UI thread."""
+        try:
+            from core.preview_utils import make_ctk_thumbnail
+            photo = make_ctk_thumbnail(video_path)
+            if photo is not None:
+                self.preview_label.configure(image=photo, text="")
+                self.preview_label.image = photo
+        except Exception:
+            pass
 
     def _on_error(self, error):
         self.is_generating = False

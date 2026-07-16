@@ -3,7 +3,6 @@ import torch
 import psutil
 from config import MODELS_DIR, MODELS
 from huggingface_hub import snapshot_download
-from tqdm import tqdm
 
 
 class ModelManager:
@@ -57,10 +56,12 @@ class ModelManager:
             progress_callback(0, f"Downloading {model_info['name']}...")
 
         try:
+            # Note: `local_dir_use_symlinks` was removed here — it is
+            # deprecated/removed in newer huggingface_hub, and the default
+            # already avoids symlinks when local_dir is used.
             snapshot_download(
                 repo_id=model_info["repo"],
                 local_dir=model_path,
-                local_dir_use_symlinks=False,
             )
             if progress_callback:
                 progress_callback(100, "Download complete")

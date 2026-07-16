@@ -64,7 +64,7 @@ class ImageToVideoGenerator:
             return False
 
     def generate_from_image(self, image_path, num_frames=25, fps=7,
-                           motion_bucket_id=127, noise_aug=0.02,
+                           motion_bucket_id=127, noise_aug=0.02, num_steps=25,
                            seed=-1, progress_callback=None, model="svd"):
         """Generate video from a single image"""
 
@@ -77,9 +77,13 @@ class ImageToVideoGenerator:
                 self.load_svd()
             elif model == "animatediff":
                 self.load_animatediff()
+            else:
+                raise ValueError(f"Unknown image-to-video model: {model}")
 
-        if self.pipe is None:
-            raise RuntimeError("Failed to load model")
+        # Guard against a failed load (load_* returns False on error) so we
+        # never silently animate with a previously loaded, different model.
+        if self.pipe is None or self.current_model != model:
+            raise RuntimeError(f"Failed to load model: {model}")
 
         # Prepare image
         if progress_callback:
@@ -92,7 +96,7 @@ class ImageToVideoGenerator:
         if seed == -1:
             seed = int(time.time()) % 2**32
         generator = torch.Generator(device="cpu").manual_seed(seed)
-        step_kwargs = make_step_kwargs(self.pipe, num_frames, progress_callback)
+        step_kwargs = make_step_kwargs(self.pipe, num_steps, progress_callback)
 
         if progress_callback:
             progress_callback(20, "Generating video...")
@@ -102,6 +106,7 @@ class ImageToVideoGenerator:
                 result = self.pipe(
                     image=image,
                     num_frames=num_frames,
+                    num_inference_steps=num_steps,
                     decode_chunk_size=8,
                     motion_bucket_id=motion_bucket_id,
                     noise_aug_strength=noise_aug,
@@ -114,7 +119,7 @@ class ImageToVideoGenerator:
                 result = self.pipe(
                     prompt="product advertisement, smooth motion, professional",
                     num_frames=num_frames,
-                    num_inference_steps=25,
+                    num_inference_steps=num_steps,
                     generator=generator,
                     **step_kwargs,
                 )

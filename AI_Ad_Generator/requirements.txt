@@ -1,7 +1,6 @@
 # UI
 customtkinter==5.2.1
 Pillow==10.2.0
-ttkbootstrap==1.10.1
 
 # AI Models (core set — works with diffusers 0.27)
 diffusers==0.27.0
@@ -17,23 +16,16 @@ moviepy==1.0.3
 imageio==2.34.0
 imageio-ffmpeg==0.4.9
 
-# Image Processing
+# Image Processing (background removal)
 rembg==2.0.55
-transparent-background==1.2.12
 
 # Utilities
 numpy==1.26.4
-scipy==1.12.0
 tqdm==4.66.2
 requests==2.31.0
 huggingface-hub==0.21.0
-pyyaml==6.0.1
 psutil==5.9.8
 
-# Prompt Generation
-openai==1.12.0
-g4f==0.2.6.2
-
-# Audio
+# Audio (offline TTS + music synthesis)
 pydub==0.25.1
 pyttsx3==2.90

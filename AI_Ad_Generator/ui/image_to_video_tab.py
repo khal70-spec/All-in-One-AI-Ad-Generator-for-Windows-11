@@ -289,12 +289,20 @@ class ImageToVideoTab:
                 self.parent.after(0, lambda: self.progress_label.configure(
                     text=f"✅ Image ready: {os.path.basename(out)}"))
             except Exception as e:
-                self.parent.after(0, lambda: self.progress_label.configure(
-                    text=f"❌ Image error: {e}"))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self.progress_label.configure(
+                    text=f"❌ Image error: {m}"))
             finally:
                 self.is_img_gen = False
 
         threading.Thread(target=run, daemon=True).start()
+
+    def _get_seed(self):
+        """Parse the seed entry safely; -1 (random) on invalid input."""
+        try:
+            return int(self.seed_entry.get().strip())
+        except (ValueError, AttributeError):
+            return -1
 
     def _generate(self):
         if self.is_generating or not self.selected_image:
@@ -302,82 +310,88 @@ class ImageToVideoTab:
                 self.progress_label.configure(text="⚠️ Please select an image first!")
             return
 
+        # Snapshot all widget values on the UI thread (tkinter is not
+        # thread-safe, so the worker must not read widgets directly).
+        model = self.model_var.get()
+        provider_key = self.provider_var.get()
+        prompt = (self.gen_prompt_entry.get().strip()
+                 or "product advertisement, smooth motion, professional")
+        remove_bg = self.remove_bg_var.get()
+        enhance = self.enhance_var.get()
+        upscale = self.upscale_var.get()
+        num_frames = int(self.frames_slider.get())
+        motion = int(self.motion_slider.get())
+        noise = float(self.noise_slider.get())
+        seed = self._get_seed()
+        source_image = self.selected_image
+
         self.is_generating = True
         self.generate_btn.configure(state="disabled", text="⏳ Generating...")
 
         def run():
             try:
-                model = self.model_var.get()
-
                 # ---- Online image-to-video (Pika / Luma) ----
                 if model == "online (Pika/Luma)":
-                    if not self.selected_image:
-                        self.parent.after(
-                            0, lambda: self.progress_label.configure(
-                                text="⚠️ Select an image first!"))
-                        return
                     self._update_progress(5, "Submitting to cloud provider...")
                     from core.online_apis import get_provider
-                    provider = get_provider(self.provider_var.get())
-                    prompt = (self.gen_prompt_entry.get().strip()
-                             or "product advertisement, smooth motion, professional")
+                    provider = get_provider(provider_key)
                     out = provider.generate(
                         prompt=prompt,
-                        image_path=self.selected_image,
+                        image_path=source_image,
                         progress_callback=self._update_progress,
                     )
                     self.parent.after(0, lambda: self._on_complete(out))
                     return
 
-                image_path = self.selected_image
+                image_path = source_image
 
                 # Process image
-                if self.remove_bg_var.get():
+                if remove_bg:
                     self._update_progress(5, "Removing background...")
                     image_path = self.bg_remover.remove_background(image_path)
 
-                if self.enhance_var.get():
+                if enhance:
                     self._update_progress(10, "Enhancing image...")
                     image_path = self.image_editor.enhance_image(
                         image_path, brightness=1.05, contrast=1.1, sharpness=1.2)
 
-                if self.upscale_var.get():
+                if upscale:
                     self._update_progress(15, "Upscaling image (online)...")
                     image_path = self.upscaler.upscale_image(image_path)
 
                 output = self.generator.generate_from_image(
                     image_path=image_path,
-                    num_frames=int(self.frames_slider.get()),
-                    motion_bucket_id=int(self.motion_slider.get()),
-                    noise_aug=float(self.noise_slider.get()),
-                    seed=int(self.seed_entry.get()),
-                    model=self.model_var.get(),
+                    num_frames=num_frames,
+                    motion_bucket_id=motion,
+                    noise_aug=noise,
+                    seed=seed,
+                    model=model,
                     progress_callback=self._update_progress,
                 )
 
                 self.parent.after(0, lambda: self._on_complete(output))
 
             except Exception as e:
+                local_err = str(e)
                 # Optional cloud fallback when local generation fails
                 from config import USER_SETTINGS
                 if (USER_SETTINGS.get("use_online_fallback")
                         and model != "online (Pika/Luma)"
-                        and self.selected_image):
+                        and source_image):
                     try:
                         from core.online_apis import try_fallback
-                        prompt = (self.gen_prompt_entry.get().strip()
-                                 or "product advertisement, smooth motion, professional")
                         self._update_progress(0, "Local failed — trying cloud...")
                         out = try_fallback(prompt=prompt,
-                                          image_path=self.selected_image,
+                                          image_path=source_image,
                                           progress_callback=self._update_progress)
                         self.parent.after(0, lambda: self._on_complete(out))
                         return
                     except Exception as fe:
-                        self.parent.after(0, lambda: self._on_error(
-                            f"Local: {e}\nCloud: {fe}"))
+                        cloud_err = str(fe)
+                        self.parent.after(0, lambda m=f"Local: {local_err}\nCloud: {cloud_err}":
+                                          self._on_error(m))
                         return
-                self.parent.after(0, lambda: self._on_error(str(e)))
+                self.parent.after(0, lambda m=local_err: self._on_error(m))
 
         thread = threading.Thread(target=run, daemon=True)
         thread.start()
@@ -405,29 +419,25 @@ class ImageToVideoTab:
             print(f"Preview error: {e}")
 
         # Optional sound (voiceover + background music)
-        if self.sound_voice_var.get() or self.sound_music_var.get():
+        voice = self.sound_voice_var.get()
+        music = self.sound_music_var.get()
+        if voice or music:
             self.progress_label.configure(text="🔊 Adding sound...")
+            prompt = self.gen_prompt_entry.get().strip()
             threading.Thread(target=self._add_sound,
-                            args=(output_path,), daemon=True).start()
+                            args=(output_path, prompt, voice, music),
+                            daemon=True).start()
 
-    def _add_sound(self, video_path):
+    def _add_sound(self, video_path, prompt, voiceover, music):
         try:
             from core.sound import add_sound_to_video
-            prompt = self.gen_prompt_entry.get().strip()
             out = add_sound_to_video(
                 video_path, prompt=prompt,
-                voiceover=self.sound_voice_var.get(),
-                music=self.sound_music_var.get())
+                voiceover=voiceover,
+                music=music)
             if out and os.path.exists(out):
                 self.last_output = out
-                try:
-                    from core.preview_utils import make_ctk_thumbnail
-                    photo = make_ctk_thumbnail(out)
-                    if photo is not None:
-                        self.video_label.configure(image=photo, text="")
-                        self.video_label.image = photo
-                except Exception:
-                    pass
+                self.parent.after(0, lambda: self._refresh_preview(out))
                 self.parent.after(
                     0, lambda: self.progress_label.configure(
                         text="✅ Done — video with sound!"))
@@ -437,6 +447,17 @@ class ImageToVideoTab:
         self.parent.after(
             0, lambda: self.progress_label.configure(
                 text="✅ Video ready (sound skipped)"))
+
+    def _refresh_preview(self, video_path):
+        """Update the preview thumbnail. Must run on the UI thread."""
+        try:
+            from core.preview_utils import make_ctk_thumbnail
+            photo = make_ctk_thumbnail(video_path)
+            if photo is not None:
+                self.video_label.configure(image=photo, text="")
+                self.video_label.image = photo
+        except Exception:
+            pass
 
     def _on_error(self, error):
         self.is_generating = False

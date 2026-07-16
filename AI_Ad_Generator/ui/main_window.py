@@ -9,7 +9,7 @@ from ui.batch_tab import BatchTab
 from ui.gallery_tab import GalleryTab
 from core.model_manager import ModelManager
 from core.prompt_generator import PromptGenerator
-from config import APP_NAME, APP_VERSION
+from config import APP_NAME, APP_VERSION, ASSETS_DIR
 import os
 
 
@@ -31,10 +31,13 @@ class MainWindow:
         self.root.geometry("1200x800")
         self.root.minsize(1000, 700)
 
-        # Try to set icon
-        icon_path = "assets/icon.ico"
+        # Try to set icon (absolute path so it works from any launch cwd)
+        icon_path = os.path.join(ASSETS_DIR, "icon.ico")
         if os.path.exists(icon_path):
-            self.root.iconbitmap(icon_path)
+            try:
+                self.root.iconbitmap(icon_path)
+            except Exception:
+                pass
 
         self._create_ui()
 

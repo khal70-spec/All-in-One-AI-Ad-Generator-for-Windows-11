@@ -259,7 +259,8 @@ class BatchTab:
                 err = sum(1 for r in results if r["status"] == "error")
                 self.parent.after(0, lambda: self._on_done(ok, err))
             except Exception as e:
-                self.parent.after(0, lambda: self._on_done(0, len(jobs), str(e)))
+                msg = str(e)
+                self.parent.after(0, lambda m=msg: self._on_done(0, len(jobs), m))
 
         threading.Thread(target=run, daemon=True).start()
 

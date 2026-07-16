@@ -36,8 +36,12 @@ def configure_ffmpeg():
         from pydub import AudioSegment
         AudioSegment.converter = exe
         AudioSegment.ffmpeg = exe
-        AudioSegment.ffprobe = exe.replace("ffmpeg", "ffprobe") \
-            if "ffmpeg" in exe else exe
+        # imageio-ffmpeg bundles ffmpeg only; set ffprobe only if a real
+        # binary sits next to it (otherwise leave pydub's default).
+        if "ffmpeg" in os.path.basename(exe):
+            probe = exe.replace("ffmpeg", "ffprobe")
+            if os.path.exists(probe):
+                AudioSegment.ffprobe = probe
     except Exception:
         pass
 

@@ -109,7 +109,8 @@ class VideoEditor:
             output_path = os.path.join(OUTPUTS_DIR, f"{name}_speed.mp4")
 
         clip = VideoFileClip(video_path)
-        final = clip.fx(lambda c: c.speedx(speed))
+        # `moviepy.editor` registers speedx() as a VideoClip method.
+        final = clip.speedx(speed)
         final.write_videofile(output_path, codec="libx264")
 
         clip.close()

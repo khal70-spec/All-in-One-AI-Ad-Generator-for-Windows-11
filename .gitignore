@@ -17,3 +17,6 @@ AI_Ad_Generator/temp/*
 build/
 dist/
 *.spec
+
+# Local user settings (contains API keys — never commit)
+AI_Ad_Generator/config.json

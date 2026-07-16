@@ -137,17 +137,26 @@ class SettingsTab:
                       fg_color=COLORS["bg_light"],
                       command=lambda: os.startfile(OUTPUTS_DIR)).pack(side="right")
 
-        # Half precision
-        self.fp16_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(settings_frame, text="Use FP16 (faster, less VRAM)",
-                       variable=self.fp16_var,
-                       fg_color=COLORS["accent"]).pack(anchor="w", padx=20, pady=5)
+        # Precision / offload are applied automatically by the model loaders
+        # (FP16 on CUDA, FP32 on CPU; CPU offloading whenever a GPU is
+        # available). Shown as info rather than fake toggles.
+        ctk.CTkLabel(
+            settings_frame,
+            text="ℹ️ FP16 precision is used automatically on CUDA GPUs "
+                 "(FP32 on CPU).",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            justify="left",
+        ).pack(anchor="w", padx=20, pady=(5, 0))
 
-        # CPU offload
-        self.offload_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(settings_frame, text="Enable CPU Offloading",
-                       variable=self.offload_var,
-                       fg_color=COLORS["accent"]).pack(anchor="w", padx=20, pady=5)
+        ctk.CTkLabel(
+            settings_frame,
+            text="ℹ️ Model CPU offloading is enabled automatically when a "
+                 "GPU is detected to save VRAM.",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            justify="left",
+        ).pack(anchor="w", padx=20, pady=(0, 5))
 
         # Clear cache button
         ctk.CTkButton(
@@ -239,8 +248,15 @@ class SettingsTab:
         self.wh_log.pack(fill="x", padx=15, pady=(0, 15))
 
     def _wh_log(self, msg):
-        self.wh_log.insert("end", msg + "\n")
-        self.wh_log.see("end")
+        # Called from the HTTP server thread — marshal widget updates onto
+        # the UI thread (tkinter is not thread-safe).
+        def _append():
+            self.wh_log.insert("end", msg + "\n")
+            self.wh_log.see("end")
+        try:
+            self.parent.after(0, _append)
+        except Exception:
+            pass
 
     def _start_webhook(self):
         try:
@@ -288,10 +304,11 @@ class SettingsTab:
                 self.parent.after(0, lambda: btn.configure(
                     text="✅ Downloaded", fg_color=COLORS["success"]))
             except Exception as e:
+                msg = str(e)
                 self.parent.after(0, lambda: btn.configure(
                     text="❌ Failed", fg_color=COLORS["error"], state="normal"))
-                self.parent.after(0, lambda: self.dl_label.configure(
-                    text=f"Error: {str(e)}"))
+                self.parent.after(0, lambda m=msg: self.dl_label.configure(
+                    text=f"Error: {m}"))
 
         threading.Thread(target=run, daemon=True).start()
 

@@ -30,7 +30,8 @@ class TextToVideoGenerator:
         pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
         if torch.cuda.is_available():
-            pipe.to("cuda")
+            # CPU offload already handles moving weights to the GPU on demand;
+            # calling pipe.to("cuda") first defeats its purpose.
             pipe.enable_model_cpu_offload()
 
         self.pipe = pipe
@@ -167,9 +168,14 @@ class TextToVideoGenerator:
                 self.load_hunyuanvideo()
             elif model == "ltx_video":
                 self.load_ltx()
+            else:
+                raise ValueError(f"Unknown text-to-video model: {model}")
 
-        if self.pipe is None:
-            raise RuntimeError("Failed to load model")
+        # Guard against a failed load (load_* returns False on error, or an
+        # unknown model) so we never silently generate with a previously
+        # loaded, different model.
+        if self.pipe is None or self.current_model != model:
+            raise RuntimeError(f"Failed to load model: {model}")
 
         # Set seed
         if seed == -1:

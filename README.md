@@ -117,8 +117,8 @@ This uses PyInstaller to produce `dist/AI_Ad_Generator/AI_Ad_Generator.exe`.
   in-app **Model Manager**) — ensure a good internet connection and enough disk
   space.
 - `CogVideoX` needs ~16 GB VRAM; `ZeroScope` / `SVD` / `AnimateDiff` work with
-  ~8 GB. On systems with less VRAM, keep **FP16** and **CPU Offloading**
-  enabled in Settings.
+  ~8 GB. **FP16** precision and **CPU offloading** are applied automatically
+  whenever a CUDA GPU is detected, which already minimizes VRAM use.
 - Generated videos are saved to `AI_Ad_Generator/outputs/` as `.mp4`.
 - `os.startfile(...)` calls are Windows-specific; on other OSes the
   "Open Folder / Play" buttons won't work (the generation pipeline itself is
