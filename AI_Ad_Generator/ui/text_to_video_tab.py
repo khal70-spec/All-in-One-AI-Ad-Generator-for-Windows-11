@@ -41,7 +41,7 @@ class TextToVideoTab:
         model_menu = ctk.CTkOptionMenu(
             left_panel,
             variable=self.model_var,
-            values=["zeroscope", "cogvideox"],
+            values=["zeroscope", "cogvideox", "modelscope"],
             fg_color=COLORS["entry_bg"],
             button_color=COLORS["accent"],
         )

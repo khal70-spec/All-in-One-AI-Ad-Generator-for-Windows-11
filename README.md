@@ -19,16 +19,20 @@ AI_Ad_Generator/
 │   ├── prompt_generator.py  # Optimized ad-prompt builder
 │   ├── background_remover.py# U2Net background removal
 │   ├── image_editor.py      # Resize / text overlay / enhance
-│   ├── text_to_video.py     # ZeroScope / CogVideoX
+│   ├── text_to_video.py     # ZeroScope / CogVideoX / ModelScope
 │   ├── image_to_video.py    # Stable Video Diffusion / AnimateDiff
-│   └── video_editor.py      # Cut, text, music, combine, loop, speed
+│   ├── text_to_image.py     # Stable Diffusion XL (product images)
+│   ├── video_editor.py      # Cut, text, music, combine, loop, speed
+│   ├── batch.py             # Queue many jobs across the engines
+│   └── online_apis.py       # Pika / Luma cloud video generation
 ├── ui/                  # CustomTkinter front-end
 │   ├── main_window.py       # Window, header, tabview, status bar
 │   ├── text_to_video_tab.py # Text → Video generation tab
-│   ├── image_to_video_tab.py# Image → Video generation tab
+│   ├── image_to_video_tab.py# Image → Video (+ SDXL image gen) tab
 │   ├── prompt_tab.py        # Prompt generator tab
 │   ├── editor_tab.py        # Video editor tab
-│   ├── settings_tab.py      # System info + model manager tab
+│   ├── batch_tab.py         # Batch generation tab
+│   ├── settings_tab.py      # System info + model manager + API keys
 │   └── styles.py            # Colors & fonts theme
 ├── models/              # Downloaded model weights (created at runtime)
 ├── outputs/             # Generated videos (created at runtime)
@@ -40,11 +44,14 @@ AI_Ad_Generator/
 
 | Area | Highlights |
 |------|-----------|
-| 📝 **Text to Video** | ZeroScope V2, CogVideoX, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed |
+| 📝 **Text to Video** | ZeroScope V2, CogVideoX, **ModelScope T2V**, 5 ad templates, custom prompts, adjustable steps/guidance/frames/resolution/seed |
 | 🖼 **Image to Video** | Stable Video Diffusion, AnimateDiff, auto background removal, image enhancement, motion control |
+| 🎨 **Image Generation** | **Stable Diffusion XL** to create product images from text (then animate them) |
 | 💡 **Prompt Generator** | 8 styles (cinematic/luxury/tech/…), batch variations, quick templates, auto negative prompts |
+| 🔁 **Batch** | Run many products/images in one queue (Text→Video, Image→Video, Image Gen, **Online Pika/Luma**) with live progress + stop |
 | ✂️ **Video Editor** | Text overlay, background music, combine videos, loop, speed adjustment |
-| ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading |
+| 🌐 **Online APIs** | Optional **Pika** / **Luma** cloud generation when no GPU is available (keys stored in `config.json`) |
+| ⚙️ **Settings** | One-click model download, GPU/CPU auto-detect, system info, FP16 & CPU offloading, API-key management |
 
 ## 🛠 Requirements
 

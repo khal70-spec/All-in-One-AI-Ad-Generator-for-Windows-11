@@ -36,6 +36,30 @@ class TextToVideoGenerator:
         self.current_model = "zeroscope"
         return True
 
+    def load_modelscope(self):
+        """Load ModelScope text-to-video (damo-vilab/text-to-video-ms-1.7b)"""
+        try:
+            from diffusers import TextToVideoSDPipeline
+
+            model_path = os.path.join(MODELS_DIR, "modelscope")
+            if not os.path.exists(model_path):
+                model_path = "damo-vilab/text-to-video-ms-1.7b"
+
+            pipe = TextToVideoSDPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            )
+
+            if torch.cuda.is_available():
+                pipe.enable_model_cpu_offload()
+
+            self.pipe = pipe
+            self.current_model = "modelscope"
+            return True
+        except Exception as e:
+            print(f"ModelScope load error: {e}")
+            return False
+
     def load_cogvideox(self):
         """Load CogVideoX for text-to-video"""
         try:
@@ -74,6 +98,8 @@ class TextToVideoGenerator:
                 self.load_zeroscope()
             elif model == "cogvideox":
                 self.load_cogvideox()
+            elif model == "modelscope":
+                self.load_modelscope()
 
         if self.pipe is None:
             raise RuntimeError("Failed to load model")
@@ -106,6 +132,20 @@ class TextToVideoGenerator:
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     num_frames=num_frames,
+                    num_inference_steps=num_steps,
+                    guidance_scale=guidance_scale,
+                    generator=generator,
+                )
+                frames = result.frames[0]
+
+            elif self.current_model == "modelscope":
+                # ModelScope T2V does not take a negative prompt and is trained
+                # at 256x256, so we pin the resolution to keep memory/shape safe.
+                result = self.pipe(
+                    prompt=prompt,
+                    num_frames=min(num_frames, 16),
+                    height=256,
+                    width=256,
                     num_inference_steps=num_steps,
                     guidance_scale=guidance_scale,
                     generator=generator,

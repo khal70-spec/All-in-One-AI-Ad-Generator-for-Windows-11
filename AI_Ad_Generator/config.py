@@ -1,4 +1,5 @@
 import os
+import json
 
 # ============================================
 # APPLICATION CONFIGURATION
@@ -48,6 +49,12 @@ MODELS = {
     "zeroscope": {
         "name": "ZeroScope V2",
         "repo": "cerspense/zeroscope_v2_576w",
+        "type": "text_to_video",
+        "vram": 8,
+    },
+    "modelscope": {
+        "name": "ModelScope T2V",
+        "repo": "damo-vilab/text-to-video-ms-1.7b",
         "type": "text_to_video",
         "vram": 8,
     },
@@ -108,3 +115,58 @@ AD_TEMPLATES = {
         "guidance": 8.0,
     },
 }
+
+# ============================================
+# ONLINE API CONNECTIONS (Pika / Luma / etc.)
+# ============================================
+# These are OPTIONAL. Leave keys empty to disable. The app works fully offline
+# without them. When a key is provided the corresponding provider can generate
+# videos from the cloud (useful on machines without a GPU).
+
+ONLINE_PROVIDERS = {
+    "pika": {
+        "name": "Pika",
+        "base_url": "https://api.pika.art/v1",
+        "auth_scheme": "key",  # header: Authorization: Key <KEY>
+        "needs_key": True,
+    },
+    "luma": {
+        "name": "Luma Dream Machine",
+        "base_url": "https://api.luma.ai/v1",
+        "auth_scheme": "bearer",  # header: Authorization: Bearer <KEY>
+        "needs_key": True,
+    },
+}
+
+# Persisted user settings (API keys, etc.)
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+USER_SETTINGS = {
+    "pika_api_key": "",
+    "luma_api_key": "",
+    "use_online_fallback": False,
+}
+
+
+def load_settings():
+    """Load user settings (API keys, prefs) from config.json if present."""
+    global USER_SETTINGS
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            USER_SETTINGS.update({k: v for k, v in data.items() if k in USER_SETTINGS})
+    except Exception:
+        pass
+
+
+def save_settings():
+    """Persist current user settings to config.json."""
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(USER_SETTINGS, f, indent=2)
+    except Exception:
+        pass
+
+
+# Load any previously saved settings at import time
+load_settings()

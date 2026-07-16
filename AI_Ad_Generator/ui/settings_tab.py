@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from ui.styles import COLORS, FONTS
-from config import MODELS
+from config import MODELS, USER_SETTINGS, save_settings, ONLINE_PROVIDERS
 import threading
 import os
 
@@ -154,6 +154,44 @@ class SettingsTab:
             fg_color=COLORS["error"],
             command=self._clear_temp,
         ).pack(fill="x", padx=15, pady=15)
+
+        # ============ ONLINE APIS ============
+        api_frame = ctk.CTkFrame(main_frame, fg_color=COLORS["bg_medium"],
+                               corner_radius=10)
+        api_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(api_frame, text="🌐 Online APIs (Pika / Luma)",
+                     font=FONTS["heading"]).pack(pady=(15, 5))
+
+        ctk.CTkLabel(api_frame,
+                     text="Optional. Add API keys to generate videos in the cloud "
+                          "when no GPU is available. Keys are stored locally in config.json.",
+                     font=FONTS["small"],
+                     text_color=COLORS["text_secondary"]).pack(padx=20, pady=(0, 10))
+
+        self.api_entries = {}
+        for key, prov in ONLINE_PROVIDERS.items():
+            row = ctk.CTkFrame(api_frame, fg_color="transparent")
+            row.pack(fill="x", padx=15, pady=4)
+            ctk.CTkLabel(row, text=f"{prov['name']} API Key:",
+                        font=FONTS["body"], width=160, anchor="w").pack(side="left")
+            entry = ctk.CTkEntry(row, fg_color=COLORS["entry_bg"], show="*")
+            entry.insert(0, USER_SETTINGS.get(f"{key}_api_key", ""))
+            entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.api_entries[key] = entry
+
+        ctk.CTkButton(
+            api_frame,
+            text="💾 Save API Keys",
+            fg_color=COLORS["accent"],
+            command=self._save_api_keys,
+        ).pack(fill="x", padx=15, pady=(10, 15))
+
+    def _save_api_keys(self):
+        for key, entry in self.api_entries.items():
+            USER_SETTINGS[f"{key}_api_key"] = entry.get().strip()
+        save_settings()
+        self.dl_label.configure(text="✅ API keys saved to config.json")
 
     def _download_model(self, model_key):
         btn = self.model_widgets[model_key]

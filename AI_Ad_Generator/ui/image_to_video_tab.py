@@ -3,6 +3,7 @@ from ui.styles import COLORS, FONTS
 from core.image_to_video import ImageToVideoGenerator
 from core.background_remover import BackgroundRemover
 from core.image_editor import ImageEditor
+from core.text_to_image import TextToImageGenerator
 from PIL import Image, ImageTk
 from tkinter import filedialog
 import threading
@@ -18,8 +19,10 @@ class ImageToVideoTab:
         self.generator = ImageToVideoGenerator(model_manager)
         self.bg_remover = BackgroundRemover()
         self.image_editor = ImageEditor()
+        self.t2i = TextToImageGenerator(model_manager)
         self.selected_image = None
         self.is_generating = False
+        self.is_img_gen = False
 
         self._create_ui()
 
@@ -61,6 +64,26 @@ class ImageToVideoTab:
             text_color=COLORS["text_secondary"],
         )
         self.image_label.pack(expand=True)
+
+        # Generate Image (SDXL)
+        ctk.CTkLabel(left_panel, text="Or generate an image with AI:",
+                     font=FONTS["subheading"]).pack(anchor="w", padx=10, pady=(10, 0))
+
+        self.gen_prompt_entry = ctk.CTkEntry(
+            left_panel,
+            placeholder_text="Describe the product image to create...",
+            fg_color=COLORS["entry_bg"],
+        )
+        self.gen_prompt_entry.pack(fill="x", padx=10, pady=5)
+
+        ctk.CTkButton(
+            left_panel,
+            text="🎨 Generate Image (SDXL)",
+            height=38,
+            fg_color=COLORS["bg_light"],
+            hover_color=COLORS["accent"],
+            command=self._generate_base_image,
+        ).pack(fill="x", padx=10, pady=(0, 5))
 
         # Image Processing Options
         ctk.CTkLabel(left_panel, text="Image Processing:",
@@ -218,6 +241,32 @@ class ImageToVideoTab:
             self.image_label.image = photo
         except Exception as e:
             self.image_label.configure(text=f"Error: {e}")
+
+    def _generate_base_image(self):
+        prompt = self.gen_prompt_entry.get().strip()
+        if not prompt:
+            self.progress_label.configure(text="⚠️ Enter a description first!")
+            return
+        if self.is_img_gen:
+            return
+
+        self.is_img_gen = True
+        self.progress_label.configure(text="🎨 Generating image...")
+
+        def run():
+            try:
+                out = self.t2i.generate(prompt=prompt, progress_callback=self._update_progress)
+                self.selected_image = out
+                self.parent.after(0, lambda: self._show_image_preview(out))
+                self.parent.after(0, lambda: self.progress_label.configure(
+                    text=f"✅ Image ready: {os.path.basename(out)}"))
+            except Exception as e:
+                self.parent.after(0, lambda: self.progress_label.configure(
+                    text=f"❌ Image error: {e}"))
+            finally:
+                self.is_img_gen = False
+
+        threading.Thread(target=run, daemon=True).start()
 
     def _generate(self):
         if self.is_generating or not self.selected_image:
